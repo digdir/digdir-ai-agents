@@ -1,19 +1,34 @@
 # Testbed for agentic enablers
 
-In its current incarnation, the focus is to explore various configurations of the latest wave of CLI-clients 
-(Claud Code, Gemini CLI, Crush, Qwen Coder etc.) to learn how local client-side tooling can unlock gains in quality and productivity.
+In its current incarnation, the focus is to explore various configurations of the latest wave of CLI-clients
+(Claude Code, GitHub Copilot, Gemini CLI, Crush, Qwen Coder etc.) to learn how local client-side tooling can unlock gains in quality and productivity.
 
 The repo is organized in task domains under `/workflows`
 
 ## How to use
-Clone this repo, then navigate to the desired workflows-directory and start your CLI tool from there.
+Clone this repo, then navigate to the desired workflows-directory and start your AI tool from there.
 
-You will need [Claud Code](https://docs.anthropic.com/en/docs/claude-code/quickstart), or compatible tools
+### Supported AI Tools
+
+**Claude Code:**
+- [Installation guide](https://docs.anthropic.com/en/docs/claude-code/quickstart)
+- Agent configuration: `.claude/agents/`
 
 ```bash
 cd workflows/documentation
 claude
 ```
+
+**GitHub Copilot:**
+- [Installation guide](https://docs.github.com/en/copilot)
+- Agent configuration: `.github/agents/`
+
+```bash
+cd workflows/documentation
+# Open in VS Code with Copilot installed, or use:
+gh copilot chat
+```
+
 
 ## Future development
 * The initial commit is focused on Digdir and [Altinn docs](https://github.com/Altinn/altinn-studio-docs). 
