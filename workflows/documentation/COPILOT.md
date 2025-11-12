@@ -39,7 +39,7 @@ Hoveddokumentasjonen som brukerne ser, ligger i repo [altinn-studio-docs](https:
 - Skriv alltid på norsk først, deretter engelsk
 - Skriv primært på **norsk bokmål** (konservativ form)
 - Alt innhold må oversettes til engelsk
-- Følg `.github/TERMINOLOGY.md` for godkjente oversettelser
+- Følg `TERMINOLOGY.md` for godkjente oversettelser
 - Bruk language-editor agenter proaktivt for språkkvalitet
 - Følg Diátaxis strengt - explanation vs guide vs tutorial vs reference
 
@@ -144,10 +144,10 @@ Hoveddokumentasjonen for brukerne er bygd med Hugo (se instruksjoner i readme-fi
 De tilgjengelige agentene vil automatisk lese disse filene når de starter arbeidet:
 
 ### Skriveveiledning
-`.github/WRITING-GUIDE.md` - Retningslinjer for både norsk og engelsk skriving, inkludert Diátaxis-modellen og 3-fase oversettelsesarbeidsflyt.
+`WRITING-GUIDE.md` - Retningslinjer for både norsk og engelsk skriving, inkludert Diátaxis-modellen og 3-fase oversettelsesarbeidsflyt.
 
 ### Terminologi
-`.github/TERMINOLOGY.md` - Godkjente oversettelser og termer som IKKE skal oversettes (Dialogporten, Altinn, Maskinporten, etc.).
+`TERMINOLOGY.md` - Godkjente oversettelser og termer som IKKE skal oversettes (Dialogporten, Altinn, Maskinporten, etc.).
 
 ## Kommandoer å huske
 
