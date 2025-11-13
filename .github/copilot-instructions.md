@@ -167,16 +167,23 @@ Documentation is organized by:
 3. **Read agent guidelines** - Review technical-writer.md and language-editor files
 4. **Write Norwegian first** - Follow Klarspråk principles from language-editor-nb.md
 5. **Translate to English** - Maintain identical structure using language-editor-en.md
-6. **START HUGO SERVER** - Run `hugo server --navigateToChanged` in altinn-studio-docs
+6. **START HUGO SERVER** - Navigate to `workflows/documentation/repos/altinn-studio-docs` and run `hugo server --navigateToChanged`
 7. **Preview documentation** - Visit http://localhost:1313/ and verify rendering
 8. **Run PII check** - Execute `python utils/pii-check/pii-check.py`
+   - **CRITICAL**: If PII warnings are found (phone numbers, org numbers, fnr):
+     - **STOP** - Do NOT automatically add to permitted-data.config
+     - **SHOW** the user all detected values with file locations
+     - **ASK** user: "These values were found in the documentation. Are these approved test data that should be added to permitted-data.config, or should they be replaced?"
+     - **WAIT** for user confirmation before adding to permitted list
+     - **ONLY ADD** to permitted-data.config after explicit user approval
 9. **Create PR** - Only after all above steps pass
 
 ### Testing Documentation
 
 Before creating a PR:
-1. Run Hugo locally: `hugo server --navigateToChanged`
-2. Preview at http://localhost:1313/
+1. Navigate to `workflows/documentation/repos/altinn-studio-docs`
+2. Run Hugo locally: `hugo server --navigateToChanged`
+3. Preview at http://localhost:1313/
 3. Verify both language versions
 4. Check all links work
 5. Verify shortcodes render correctly
@@ -215,8 +222,8 @@ gh pr create --title "Title" --body "Description"
 
 ### Hugo
 ```bash
-# Start local server
-cd repos/altinn-studio-docs
+# Start local server (MUST be run from altinn-studio-docs directory)
+cd workflows/documentation/repos/altinn-studio-docs
 hugo server --navigateToChanged
 
 # Access at http://localhost:1313/
@@ -240,7 +247,8 @@ cd workflows/documentation/repos
 gh repo clone Altinn/altinn-studio-docs
 
 # 3. Explore existing structure
-cd altinn-studio-docs
+# 3. Explore existing structure
+cd workflows/documentation/repos/altinn-studio-docs
 find content -name "*.nb.md" | grep [topic]
 
 # 4. Create branch
@@ -248,11 +256,12 @@ git checkout -b docs/new-feature
 
 # 5. Write documentation (following WRITING-GUIDE.md and TERMINOLOGY.md)
 
-# 6. Test with Hugo
+# 6. Test with Hugo (MUST be in altinn-studio-docs directory)
+cd workflows/documentation/repos/altinn-studio-docs
 hugo server --navigateToChanged
 
 # 7. Run PII check
-cd ../../..
+cd ../..
 python utils/pii-check/pii-check.py --root-folder repos/altinn-studio-docs/content/[path]
 
 # 8. Commit and create PR
