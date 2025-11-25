@@ -247,7 +247,6 @@ cd workflows/documentation/repos
 gh repo clone Altinn/altinn-studio-docs
 
 # 3. Explore existing structure
-# 3. Explore existing structure
 cd workflows/documentation/repos/altinn-studio-docs
 find content -name "*.nb.md" | grep [topic]
 

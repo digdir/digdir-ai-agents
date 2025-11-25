@@ -1,5 +1,5 @@
 ---
-name: language-editor-nb
+name: language-editor.nb
 description: Bruk denne agenten for norsk (bokmål) språkgjennomgang, oversettelse og kvalitetssikring. Spesialiserer seg på Klarspråk-prinsipper og norske skriveregler.
 tools: ["read", "edit", "search"]
 ---

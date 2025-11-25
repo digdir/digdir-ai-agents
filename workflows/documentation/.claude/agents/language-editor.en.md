@@ -1,5 +1,5 @@
 ---
-name: copywriter-english
+name: language-editor.en
 description: Bruk denne agenten når du skal oversette eller gjøre språkvask av engelsk tekst.
 color: white
 ---

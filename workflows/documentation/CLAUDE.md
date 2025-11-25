@@ -5,7 +5,7 @@ Dette er undermappen `/workflows/documentation`, som er rotmappen spesielt tilpa
 
 ## Tilgjengelige oversettings- og skriveagenter
 - Bruk `technical-writer`-agenten for å forfatte tekniske dokumentasjonstekster
-- Bruk `copywriter-norsk` og `copywriter-english`-agentene for oversettelse og språkforbedring
+- Bruk `language-editor.nb` og `language-editor.en`-agentene for oversettelse og språkforbedring
 
 ## Veiledning for å løse GitHub issues som krever teknisk dokumentasjon i altinn-studio-docs
 Bruk undermappen `./repos` til å klone repo-er inn i (i nye undermapper), etter behov. For eksempel hvis du trenger å arbeide med både brukerdokumentasjon og se på kode fra et kode-repo.
@@ -59,9 +59,9 @@ Bruk **Diátaxis-modellen** for dokumentasjonstyper:
 - **Referanse (Reference)**: Informasjonsfokuserte, detaljerte spesifikasjoner
 
 ##### Kvalitetssikring av norsk tekst
-- Bruk copywriter-norsk agenten for språkvask:
+- Bruk language-editor.nb agenten for språkvask:
 ```
-Task med subagent_type: "copywriter-norsk"
+Task med subagent_type: "language-editor.nb"
 ```
 - Be om gjennomgang mot WRITING-GUIDE.md og TERMINOLOGY.md
 - Implementer forbedringsforslag

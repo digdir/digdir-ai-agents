@@ -68,7 +68,7 @@ Dette dokumentet beskriver en 3-faset arbeidsflyt for profesjonell oversettelse,
 ##### Prosess
 
 1.  Bruk `technical-writer`-agenten for å forfatte første versjon av den tekniske dokumentasjonen
-2.  **Gjennomgang av Kildetekst:** Bruk `copywriter-norsk`-agenten for går gjennom teksten for å:
+2.  **Gjennomgang av Kildetekst:** Bruk `language-editor.en`-agenten for går gjennom teksten for å:
     *   Korrigere grammatiske feil, stavefeil og tegnsetting.
     *   Forbedre setningsstruktur og flyt.
     *   Sikre konsistent terminologi (spesielt viktig for teknisk dokumentasjon).
@@ -80,7 +80,7 @@ Dette dokumentet beskriver en 3-faset arbeidsflyt for profesjonell oversettelse,
 
 **Mål:** Produsere en nøyaktig, flytende og idiomatisk oversettelse som formidler budskapet fra kildeteksten effektivt.
 
-1.  **Oversettelse:** Bruk `copywriter-english`-agenten for å oversette den språkvaskede norske teksten.
+1.  **Oversettelse:** Bruk `language-editor.en`-agenten for å oversette den språkvaskede norske teksten.
     *   Fokus på nøyaktighet og bevaring av mening.
     *   Tilpasning til engelsk idiomatikk og kulturelle nyanser.
     *   Bruk av godkjent terminologi (fra ordlister/terminologibaser).

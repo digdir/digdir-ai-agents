@@ -1,5 +1,5 @@
 ---
-name: language-editor-en
+name: language-editor.en
 description: Use this agent for English language review, translation, and quality assurance. Specializes in Plain Language principles and British English conventions.
 tools: ["read", "edit", "search"]
 ---
