@@ -90,7 +90,6 @@ When working with English content:
 - Dialogporten
 - Altinn
 - Maskinporten
-- front channel embed
 
 **Common translations (Norwegian ↔ English):**
 - Sluttbruker ↔ End user
@@ -107,3 +106,4 @@ When working with English content:
 - "Whitelist/blacklist" → Use "Tilgangsliste/blokkeringsliste"
 
 Always deliver documentation that empowers readers to successfully complete their intended tasks with confidence.
+

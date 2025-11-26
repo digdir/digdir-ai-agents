@@ -17,8 +17,9 @@ Hoveddokumentasjonen som brukerne ser, ligger i repo [altinn-studio-docs](https:
 - Skriv primært på **norsk bokmål** (konservativ form)
 - Alt innhold må oversettes til engelsk
 - Følg `TERMINOLOGY.md` for godkjente oversettelser
-- Bruk copywriter-agenter proaktivt for språkkvalitet
+- Bruk language-agenter proaktivt for språkkvalitet
 - Følg Diátaxis strengt - explanation vs guide vs tutorial vs reference
+- Sørg for at interne lenker peker til riktig språk ved å bruke `/nb/`- eller `/en/`-prefiks
 
 
 ### Forberedelse og planlegging
@@ -75,8 +76,9 @@ Task med subagent_type: "language-editor.nb"
 ### Tekniske sjekker
 
 #### 8. PII-kontroll
-Bruk PII-verktøyet for å kontrollere at det kun er godkjent eksempel-data som benyttes. Oppdater dokumentet dersom du har benyttet ugyldige verdier. 
-Lovlige verdier er konfigurert i @./pii-permitted-data.config
+Bruk PII-verktøyet for å kontrollere at det kun er godkjent eksempel-data som benyttes. Erstatt med nye lovlige verdier dersom du har benyttet ugyldige verdier.
+
+Lovlige verdier er konfigurert i `pii-permitted-data.config`
 
 ```bash
 python utils/pii-check/pii-check.py --root-folder [sti]

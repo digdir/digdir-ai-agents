@@ -107,7 +107,7 @@ Bruk **Diátaxis-modellen** for dokumentasjonstyper:
 ### Tekniske sjekker
 
 #### PII-kontroll
-Bruk PII-verktøyet for å kontrollere at det kun er godkjent eksempel-data som benyttes. Oppdater dokumentet dersom du har benyttet ugyldige verdier.
+Bruk PII-verktøyet for å kontrollere at det kun er godkjent eksempel-data som benyttes. Erstatt med nye lovlige verdier dersom du har benyttet ugyldige verdier.
 
 Lovlige verdier er konfigurert i `pii-permitted-data.config`
 

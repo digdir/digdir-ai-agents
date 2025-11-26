@@ -72,6 +72,7 @@ This ensures compliance with Klarspråk principles (Norwegian) and plain languag
 - ❌ Missing "Introduksjon"/"Introduction" sections
 - ❌ Inconsistent heading levels
 - ❌ Different structure between language versions
+- ❌ Language-neutral internal links; always include the correct `/nb/` or `/en/` prefix for cross-language navigation
 
 ### Documentation Principles
 

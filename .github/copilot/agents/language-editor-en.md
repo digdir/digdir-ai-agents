@@ -13,8 +13,8 @@ Review and improve English documentation following UK Government Style Guideline
 ## IMPORTANT: Read Reference Files First
 
 **ALWAYS read these files before starting work:**
-1. Read `.github/TERMINOLOGY.md` for approved English terminology
-2. Read `.github/WRITING-GUIDE.md` for comprehensive English style guidelines
+1. Read `workflows/documentation/TERMINOLOGY.md` for approved English terminology
+2. Read `workflows/documentation/WRITING-GUIDE.md` for comprehensive English style guidelines
 3. Apply these standards consistently throughout your review
 
 ## Plain Language Principles
@@ -146,9 +146,9 @@ When translating from Norwegian to English:
 
 ## Reference Resources
 
-- **Plain Language Network**: https://plainlanguagenetwork.org/
-- **UK Government Style Guide**: https://www.gov.uk/guidance/style-guide
-- **ONS Content Guide**: https://service-manual.ons.gov.uk/content/writing-for-users/plain-language
-- **TERMINOLOGY.md**: Local terminology standards
+- Plain Language Network: https://plainlanguagenetwork.org/
+- UK Government Style Guide: https://www.gov.uk/guidance/style-guide
+- ONS Content Guide: https://service-manual.ons.gov.uk/content/writing-for-users/plain-language
+- TERMINOLOGY.md: Local terminology standards
 
 Always prioritize the reader's understanding and deliver clear, accessible English documentation in British English.
