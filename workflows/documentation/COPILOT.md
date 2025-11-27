@@ -79,7 +79,7 @@ gh repo clone Altinn/altinn-studio-docs
 - Strukturer med tydelige overskrifter og underkapitler
 
 **Fase 2: Kvalitetssikring av norsk tekst**
-- Bruk `@language-editor.nb` for språkvask:
+- Bruk `@language-editor-nb` for språkvask:
 ```
 @language-editor.nb Review this Norwegian documentation for clarity and correctness
 ```
@@ -87,7 +87,7 @@ gh repo clone Altinn/altinn-studio-docs
 - Implementer forbedringsforslag
 
 **Fase 3: Oversett til engelsk**
-- Bruk `@language-editor.en` for oversettelse:
+- Bruk `@language-editor-en` for oversettelse:
 ```
 @language-editor.en Translate this Norwegian documentation to British English
 ```

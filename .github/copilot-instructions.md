@@ -8,13 +8,12 @@ This document contains instructions for both GitHub Copilot and Anthropic Claude
 
 This repository contains AI-assisted documentation workflows for creating high-quality Norwegian and English technical documentation, primarily for Altinn projects.
 
-**Your primary agent files** are located in `workflows/documentation/.github/agents/`:
-- `technical-writer.md` - Technical writing standards and practices  
-- `language-editor-nb.md` - Norwegian (Bokmål) language guidelines and Klarspråk principles
-- `language-editor-en.md` - English language guidelines and plain language principles
+**Your primary agent files** are located in `.github/agents/`:
+- `technical-writer.agent.md` - Technical writing standards and practices  
+- `language-editor-nb.agent.md` - Norwegian (Bokmål) language guidelines and Klarspråk principles
+- `language-editor-en.agent.md` - English language guidelines and plain language principles
 
-**NEVER** use instructions from `CLAUDE.md` or the `.claude/` directory.
-
+**NEVER** use instructions from `workflows/documentation/CLAUDE.md` or the `.claude/` directory.
 ## Claude: Primary Instructions  
 
 **If you are Claude, you MUST follow these instructions:**
@@ -35,15 +34,15 @@ When working on documentation tasks, **always** refer to these files:
 2. **`workflows/documentation/TERMINOLOGY.md`** - Approved terminology and translations
 
 **GitHub Copilot specific files:**
-3. **`workflows/documentation/.github/agents/technical-writer.md`** - Technical writing standards
-4. **`workflows/documentation/.github/agents/language-editor-nb.md`** - Norwegian guidelines  
-5. **`workflows/documentation/.github/agents/language-editor-en.md`** - English guidelines
+3. **`.github/agents/technical-writer.agent.md`** - Technical writing standards
+4. **`.github/agents/language-editor-nb.agent.md`** - Norwegian guidelines  
+5. **`.github/agents/language-editor-en.agent.md`** - English guidelines
 
 ### CRITICAL: Read Agent Guidelines Before Writing
 
 **BEFORE creating any documentation, you MUST:**
-1. Read the relevant language-editor file (nb.md for Norwegian, en.md for English)
-2. Read technical-writer.md for overall documentation standards
+1. Read the relevant language-editor file (nb.agent.md for Norwegian, en.agent.md for English)
+2. Read technical-writer.agent.md for overall documentation standards
 3. Apply these guidelines consistently throughout your work
 
 This ensures compliance with Klarspråk principles (Norwegian) and plain language standards (English).
