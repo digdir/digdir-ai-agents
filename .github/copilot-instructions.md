@@ -14,6 +14,8 @@ This repository contains AI-assisted documentation workflows for creating high-q
 - `language-editor-en.agent.md` - English language guidelines and plain language principles
 
 **NEVER** use instructions from `workflows/documentation/CLAUDE.md` or the `.claude/` directory.
+
+**Link hygiene requirements:** Before you finish a documentation task, validate every internal link. Confirm that the language prefix (`/nb/` or `/en/`) is correct and that the anchor slug (`#...`) exists in the target file. When possible, run `hyperlink --check-anchors --sources content/ public/` locally; otherwise manually inspect the target file to ensure the heading is present and spelled identically.
 ## Claude: Primary Instructions  
 
 **If you are Claude, you MUST follow these instructions:**
@@ -21,6 +23,8 @@ This repository contains AI-assisted documentation workflows for creating high-q
 1. **Your primary workflow file** is `workflows/documentation/CLAUDE.md`
 2. **Your agent files** are located in `workflows/documentation/.claude/agents/`  
 3. **NEVER** use instructions from the `.github/` directory
+
+**Link hygiene requirements:** Always validate internal links and anchors before completing a task. Ensure the correct language prefix is used and verify that the destination heading exists. Run the same `hyperlink --check-anchors --sources content/ public/` command when available, or manually confirm the slug in the target document.
 
 ---
 
