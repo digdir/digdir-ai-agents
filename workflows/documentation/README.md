@@ -10,12 +10,12 @@ This workflow supports both **Claude Code** and **GitHub Copilot** with speciali
 ### For Claude Code Users
 - Configuration: `.claude/agents/`
 - Usage guide: [CLAUDE.md](CLAUDE.md)
-- Agents: `technical-writer`, `language-editor.nb`, `language-editor.en`
+- Agents: `technical-writer`, `language-editor-nb`, `language-editor-en`
 
 ### For GitHub Copilot Users
 - Configuration: `.github/agents/`
 - Usage guide: [.github/COPILOT.md](.github/COPILOT.md)
-- Agents: `@technical-writer`, `@language-editor.nb`, `@language-editor.en`
+- Agents: `@technical-writer`, `@language-editor-nb`, `@language-editor-en`
 
 Both configurations share the same reference files (TERMINOLOGY.md, WRITING-GUIDE.md) to ensure consistency.
 

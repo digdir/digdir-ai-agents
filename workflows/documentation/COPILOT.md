@@ -13,20 +13,20 @@ Bruk denne agenten for å forfatte tekniske dokumentasjonstekster fra bunnen av.
 @technical-writer Create comprehensive documentation for the new OAuth authentication flow
 ```
 
-### @language-editor.nb
+### @language-editor-nb
 Bruk denne agenten for språkvask og kvalitetssikring av norsk tekst.
 
 **Eksempel på bruk:**
 ```
-@language-editor.nb Review this Norwegian documentation for language quality and clarity
+@language-editor-nb Review this Norwegian documentation for language quality and clarity
 ```
 
-### @language-editor.en
+### @language-editor-en
 Bruk denne agenten for oversettelse til engelsk og språkvask av engelsk tekst.
 
 **Eksempel på bruk:**
 ```
-@language-editor.en Translate this Norwegian documentation to British English
+@language-editor-en Translate this Norwegian documentation to British English
 ```
 
 ## Veiledning for å løse GitHub issues som krever teknisk dokumentasjon i altinn-studio-docs
@@ -81,7 +81,7 @@ gh repo clone Altinn/altinn-studio-docs
 **Fase 2: Kvalitetssikring av norsk tekst**
 - Bruk `@language-editor-nb` for språkvask:
 ```
-@language-editor.nb Review this Norwegian documentation for clarity and correctness
+@language-editor-nb Review this Norwegian documentation for clarity and correctness
 ```
 - Be om gjennomgang mot WRITING-GUIDE.md og TERMINOLOGY.md
 - Implementer forbedringsforslag
@@ -89,7 +89,7 @@ gh repo clone Altinn/altinn-studio-docs
 **Fase 3: Oversett til engelsk**
 - Bruk `@language-editor-en` for oversettelse:
 ```
-@language-editor.en Translate this Norwegian documentation to British English
+@language-editor-en Translate this Norwegian documentation to British English
 ```
 - Filnavn: `_index.en.md`
 - Behold samme struktur og weight
@@ -188,7 +188,7 @@ python utils/pii-check/pii-check.py --root-folder [sti]
 ## Tips for effektiv bruk
 
 - **Vær spesifikk**: Gi agentene klare instruksjoner og kontekst
-- **Bruk riktig agent**: technical-writer for nye tekster, language-editor.nb/en for vask
+- **Bruk riktig agent**: technical-writer for nye tekster, language-editor-nb/en for vask
 - **Følg arbeidsflyten**: Norsk → Kvalitetssikring → Engelsk
 - **Sjekk terminologi**: Agentene leser TERMINOLOGY.md, men det er lurt å verifisere
 - **Kjør PII-sjekk**: Alltid før du commiter dokumentasjon
@@ -203,10 +203,10 @@ gh issue view 123 --repo Altinn/altinn-studio-docs
 @technical-writer Create a guide for configuring message templates in Altinn 3
 
 # 3. Kvalitetssikre norsk tekst
-@language-editor.nb Review the Norwegian version for clarity and correctness
+@language-editor-nb Review the Norwegian version for clarity and correctness
 
 # 4. Oversett til engelsk
-@language-editor.en Translate the Norwegian documentation to British English
+@language-editor-en Translate the Norwegian documentation to British English
 
 # 5. Kjør PII-sjekk
 python workflows/documentation/utils/pii-check/pii-check.py --root-folder repos/altinn-studio-docs
