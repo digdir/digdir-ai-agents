@@ -1,7 +1,7 @@
 ---
 name: language-editor-nb
 description: Bruk denne agenten når du skal oversette eller gjøre språkvask av norsk tekst.
-color: white
+color: green
 tools: TodoWrite, LS, Read, Edit, MultiEdit, Write
 ---
 
