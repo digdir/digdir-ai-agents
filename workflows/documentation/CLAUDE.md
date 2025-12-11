@@ -1,5 +1,15 @@
 ﻿# CLAUDE.md
 
+## Claude: Primary Instructions  
+
+**If you are Claude, you MUST follow these instructions:**
+
+1. **Your primary workflow file** is `workflows/documentation/CLAUDE.md`
+2. **Your agent files** are located in `workflows/documentation/.claude/agents/`  
+3. **NEVER** use instructions from the `.github/` directory
+
+**Link hygiene requirements:** Always validate internal links and anchors before completing a task. Ensure the correct language prefix is used and verify that the destination heading exists. Run the same `hyperlink --check-anchors --sources content/ public/` command when available, or manually confirm the slug in the target document.
+
 ## Oversikt over repoet
 Dette er undermappen `/workflows/documentation`, som er rotmappen spesielt tilpasset for å skrive, oversette og forbedre prosadokumentasjon.
 
@@ -111,12 +121,12 @@ Hoveddokumentasjonen for brukerne er bygd med Hugo (se instruksjoner i readme-fi
 ## Generell skriveveiledning
 VIKTIG: Bruk og følg disse retningslinjene når du arbeider med tekst (spesielt i repo-et for altinn-studio-docs)
 
-@./WRITING-GUIDE.md
+@WRITING-GUIDE.md
 
 ## Terminologi
 VIKTIG: Bruk og følg disse begrepene og oversettelsene
 
-@./TERMINOLOGY.md
+@TERMINOLOGY.md
 
 ## Kommandoer å huske
 

@@ -66,53 +66,9 @@ Ask clarifying questions about:
 2. Read `.github/WRITING-GUIDE.md` for comprehensive style guidelines
 3. Apply these standards consistently throughout your work
 
-## Documentation Framework: Diátaxis Model
 
-Follow the Diátaxis model strictly:
-- **Innføring (Tutorial)**: Learning-focused, step-by-step guides for beginners
-- **Guide (How-to)**: Task-focused, problem-solving instructions
-- **Forklaring (Explanation)**: Understanding-focused, conceptual content
-- **Referanse (Reference)**: Information-focused, detailed specifications
-
-## Norwegian Documentation (Norsk bokmål)
-
-When working with Norwegian content:
-- **Diátaxis model**: Tutorial, Guide, Explanation, Reference
-- **Conservative form**: Use "listen" not "lista", "hentet" not "henta"
-- **GUI references**: Use bold text, e.g., **Klikk på Lagre og lukk**
-- **Action verbs**:
-  - "Klikk" for mouse actions
-  - "Trykk" for keyboard actions
-  - "Velg" for list selections
-- **Headings**: Infinitive for main headings, imperative for sub-headings
-- **URLs**: Add soft line break before URLs to prevent overflow
-- **Klarspråk**: Follow plain language principles from Språkrådet
-
-## English Documentation (British English)
-
-When working with English content:
-- **Diátaxis model**: Tutorial, How-to, Explanation, Reference
-- **Plain language**: 15-20 words per sentence (max 30-35)
-- **Active voice**: Preferred over passive
-- **Reading level**: Aim for 9th-grade comprehension
-- **British spelling**: organise, colour, realise
-- **Punctuation**: Single quotes for quotations
-- **Dates**: DD/MM/YYYY format
-- **Oxford Style**: Follow Oxford Style Guide conventions
-
-## Key Terminology (Read TERMINOLOGY.md for full list)
-
-**Terms NOT to translate:**
-- Dialogporten
-- Altinn
-- Maskinporten
-
-**Common translations (Norwegian ↔ English):**
-- Sluttbruker ↔ End user
-- Tjenesteeier ↔ Service owner
-- Skjema ↔ Form
-- Melding ↔ Correspondence/Message
-- Datovelger ↔ Date picker
+## Terminology Consistency
+Refer to local `TERMINOLOGY.md` for:
 
 **Terms to avoid:**
 - "Stateless app" → Use "Instansløst skjema"

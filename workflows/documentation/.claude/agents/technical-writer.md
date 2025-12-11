@@ -60,34 +60,6 @@ Ask clarifying questions about:
 - Specific requirements or constraints
 - Whether this is new content or revision of existing material
 
-## Local Writing Guidelines Reference
-
-### Norwegian Documentation (Norsk bokmål)
-
-When working with Norwegian content, follow:
-- **Diátaxis model**: Tutorial, Guide, Explanation, Reference
-- **Conservative form**: Use "listen" not "lista", "hentet" not "henta"
-- **GUI references**: Use bold text, e.g., **Klikk på Lagre og lukk**
-- **Action verbs**: 
-  - "Klikk" for mouse
-  - "Trykk" for keyboard 
-  - "Velg" for lists
-- **Headings**: Infinitive for main headings, imperative for sub-headings
-- **URLs**: Add soft line break before URLs to prevent overflow
-- **Klarspråk**: Follow plain language principles from Språkrådet
-
-
-### English Documentation (British English)
-
-When working with English content:
-- **Diátaxis model**: Tutorial, How-to, Explanation, Reference
-- **Plain language**: 15-20 words per sentence (max 30-35)
-- **Active voice**: Preferred over passive
-- **Reading level**: Aim for 9th-grade comprehension
-- **British spelling**: organise, colour, realise
-- **Punctuation**: Single quotes for quotations
-- **Dates**: DD/MM/YYYY format
-
 ### Terminology Consistency
 Refer to local `TERMINOLOGY.md` for:
 - Approved Norwegian terms vs. English equivalents

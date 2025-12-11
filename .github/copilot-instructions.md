@@ -1,6 +1,6 @@
 # AI Model-Specific Instructions
 
-This document contains instructions for both GitHub Copilot and Anthropic Claude. Each AI should only follow the instructions under its designated section.
+This document contains instructions for GitHub Copilot  
 
 ## GitHub Copilot: Primary Instructions
 
@@ -16,19 +16,10 @@ This repository contains AI-assisted documentation workflows for creating high-q
 **NEVER** use instructions from `workflows/documentation/CLAUDE.md` or the `.claude/` directory.
 
 **Link hygiene requirements:** Before you finish a documentation task, validate every internal link. Confirm that the language prefix (`/nb/` or `/en/`) is correct and that the anchor slug (`#...`) exists in the target file. When possible, run `hyperlink --check-anchors --sources content/ public/` locally; otherwise manually inspect the target file to ensure the heading is present and spelled identically.
-## Claude: Primary Instructions  
-
-**If you are Claude, you MUST follow these instructions:**
-
-1. **Your primary workflow file** is `workflows/documentation/CLAUDE.md`
-2. **Your agent files** are located in `workflows/documentation/.claude/agents/`  
-3. **NEVER** use instructions from the `.github/` directory
-
-**Link hygiene requirements:** Always validate internal links and anchors before completing a task. Ensure the correct language prefix is used and verify that the destination heading exists. Run the same `hyperlink --check-anchors --sources content/ public/` command when available, or manually confirm the slug in the target document.
 
 ---
 
-## Common Documentation Guidelines (For Both AIs)
+## Documentation Guidelines 
 
 ### Primary Reference Files
 When working on documentation tasks, **always** refer to these files:
@@ -85,13 +76,6 @@ This ensures compliance with Klarspråk principles (Norwegian) and plain languag
 - Follow approved translations from TERMINOLOGY.md
 - Both versions must have identical structure and front matter
 
-#### Diátaxis Framework
-All documentation must follow the Diátaxis model:
-- **Tutorial (Innføring)**: Learning-focused, step-by-step guides
-- **How-to Guide (Veiledning)**: Task-focused, problem-solving instructions
-- **Explanation (Forklaring)**: Understanding-focused, conceptual content
-- **Reference (Referanse)**: Information-focused, technical specifications
-
 #### File Naming Convention
 - Norwegian: `_index.nb.md`
 - English: `_index.en.md`
@@ -107,105 +91,35 @@ weight: XX  # Ordering number
 ---
 ```
 
-### Working with GitHub Issues
-
-When asked to create documentation for a GitHub issue:
-
-1. **Fetch the issue**: Use `gh issue view [number] --repo [repo]`
-2. **Analyze requirements**: Identify what documentation is needed from acceptance criteria
-3. **Explore existing docs**: Check where similar documentation exists
-4. **Create structured content**:
-   - Introduction explaining the concept
-   - Clear technical details with examples
-   - Practical guidance and recommendations
-   - Warning/info boxes for important notes
-5. **Translate to English**: Maintain identical structure
-6. **Run PII check**: Verify no sensitive data using `python utils/pii-check/pii-check.py`
-
-### Quality Standards
-
-#### Writing Style
-- **Clear and concise**: Short sentences, active voice
-- **User-focused**: Write for the reader's context
-- **Practical examples**: Include real-world scenarios
-- **Consistent terminology**: Use approved terms from TERMINOLOGY.md
-
-#### Hugo Shortcodes
-Use these for callouts:
-```markdown
-{{% notice info %}}
-Information message
-{{% /notice %}}
-
-{{% notice warning %}}
-Warning message
-{{% /notice %}}
-```
-
-#### Code Examples
-- Use appropriate syntax highlighting
-- Include context comments
-- Show both correct and incorrect usage when helpful
-
-### Repository Structure
-
-#### altinn-studio-docs
-Main documentation repository structure:
-- `/content/notifications/` - Notifications service docs
-- `/content/authorization/` - Authorization docs
-- `/content/altinn-studio/` - Altinn Studio docs
-
-Documentation is organized by:
-- **about/** - Product information
-- **getting-started/** - Initial setup guides
-- **guides/** - How-to guides (Diátaxis: how-to-guides)
-- **explanation/** - Conceptual documentation (Diátaxis: explanation)
-- **reference/** - Technical reference (Diátaxis: reference)
-
 ### Documentation Workflow Checklist
 
 **MANDATORY: Follow these steps in order when creating/updating documentation:**
 
-1. **Fetch requirements** - Get issue details with `gh issue view [number]`
-2. **Explore existing docs** - Check where similar documentation exists
-3. **Read agent guidelines** - Review technical-writer.md and language-editor files
-4. **Write Norwegian first** - Follow Klarspråk principles from language-editor-nb.md
-5. **Translate to English** - Maintain identical structure using language-editor-en.md
-6. **START HUGO SERVER** - Navigate to `workflows/documentation/repos/altinn-studio-docs` and run `hugo server --navigateToChanged`
-7. **Preview documentation** - Visit http://localhost:1313/ and verify rendering
-8. **Run PII check** - Execute `python utils/pii-check/pii-check.py`
+1. **Fetch requirements** - Get issue details with `gh issue view [number]` and capture the acceptance criteria or requested documentation scope.
+2. **Clone or update required repositories** - Use `gh repo clone` or `git pull` to ensure `altinn-studio-docs` (and any referenced repos like `altinn-notifications`) are available locally in `workflows/documentation/repos/`.
+3. **Explore existing docs** - Check where similar documentation exists
+4. **Read agent guidelines** - Review technical-writer.md and language-editor files
+5. **Plan structure and content** - Outline the document before writing:
+   - Start with an introduction that explains the concept or change
+   - Add technical details with concrete examples
+   - Provide practical guidance and recommendations
+   - Include info or warning callouts where important
+6. **Write Norwegian first** - Follow Klarspråk principles from language-editor-nb.md
+7. **Translate to English** - Maintain identical structure using language-editor-en.md
+8. **START HUGO SERVER** - Navigate to `workflows/documentation/repos/altinn-studio-docs` and run `hugo server --navigateToChanged`
+9. **Preview documentation** - Visit http://localhost:1313/ and verify rendering
+10. **Run PII check** - Execute `python utils/pii-check/pii-check.py`
    - **CRITICAL**: If PII warnings are found (phone numbers, org numbers, fnr):
      - **STOP** - Do NOT automatically add to permitted-data.config
      - **SHOW** the user all detected values with file locations
      - **ASK** user: "These values were found in the documentation. Are these approved test data that should be added to permitted-data.config, or should they be replaced?"
      - **WAIT** for user confirmation before adding to permitted list
      - **ONLY ADD** to permitted-data.config after explicit user approval
-9. **Create PR** - Only after all above steps pass
+11. **Create PR** - Only after all above steps pass
 
 ### Testing Documentation
 
-Before creating a PR:
-1. Navigate to `workflows/documentation/repos/altinn-studio-docs`
-2. Run Hugo locally: `hugo server --navigateToChanged`
-3. Preview at http://localhost:1313/
-3. Verify both language versions
-4. Check all links work
-5. Verify shortcodes render correctly
-6. Run PII check
-
 ### Common Patterns
-
-#### SMS/Email Notifications
-- Explain technical limits clearly
-- Include character count tables
-- Warn about automatic truncation
-- Provide recommendations
-
-#### Authorization/Authentication
-- Distinguish authentication (who) from authorization (what they can do)
-- Include complete XACML examples
-- Show end-to-end workflows
-- Provide testing guidance
 
 #### API Documentation
 - Include request/response examples
@@ -243,7 +157,7 @@ python utils/pii-check/pii-check.py --root-folder [path]
 ## Example Workflow
 
 ```bash
-# 1. Fetch GitHub issue
+# 1. Fetch requirements (issue scope and acceptance criteria)
 gh issue view 1098 --repo Altinn/altinn-notifications
 
 # 2. Clone documentation repo (if needed)
@@ -254,22 +168,30 @@ gh repo clone Altinn/altinn-studio-docs
 cd workflows/documentation/repos/altinn-studio-docs
 find content -name "*.nb.md" | grep [topic]
 
-# 4. Create branch
+# 4. Plan structure and outline key sections (notes or docs)
+Introduksjon → technical details → guidance → callouts
+
+# 5. Create feature branch
 git checkout -b docs/new-feature
 
-# 5. Write documentation (following WRITING-GUIDE.md and TERMINOLOGY.md)
+# 6. Write Norwegian version first, following Klarspråk principles
+code content/[path]/_index.nb.md
 
-# 6. Test with Hugo (MUST be in altinn-studio-docs directory)
-cd workflows/documentation/repos/altinn-studio-docs
+# 7. Translate to English with identical structure
+code content/[path]/_index.en.md
+
+# 8. Start Hugo server to preview changes
 hugo server --navigateToChanged
+# Open http://localhost:1313/ in browser and verify rendering
 
-# 7. Run PII check
-cd ../..
-python utils/pii-check/pii-check.py --root-folder repos/altinn-studio-docs/content/[path]
+# 9. Run PII check on updated content
+cd ../../utils/pii-check
+python pii-check.py --root-folder ../../repos/altinn-studio-docs/content/[path] \
+            --config-file permitted-data.config
 
-# 8. Commit and create PR
-cd repos/altinn-studio-docs
-git add .
+# 10. Commit and create PR once all checks pass
+cd ../../repos/altinn-studio-docs
+git add content/[path]
 git commit -m "Add documentation for [feature]"
 git push -u origin docs/new-feature
 gh pr create --title "Add documentation for [feature]" --body "..."

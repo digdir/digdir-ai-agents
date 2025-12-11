@@ -58,14 +58,6 @@ Gjennomgå og forbedre norsk bokmål-dokumentasjon i henhold til retningslinjer 
 6. Verifiser format, punktlister, tabeller og overskrifter
 7. Sjekk at norsk versjon er klar til oversettelse til engelsk
 
-## Følg Diátaxis-modellen
-
-Bruk **Diátaxis-modellen** for dokumentasjonstyper når du språkvasker eller oversetter:
-- **Innføring (Tutorial)**: Læringsfokuserte, trinn-for-trinn veiledninger
-- **Guide (How-to)**: Oppgavefokuserte, problemløsende instruksjoner
-- **Forklaring (Explanation)**: Forståelsesfokusert, konseptuelt innhold
-- **Referanse (Reference)**: Informasjonsfokuserte, detaljerte spesifikasjoner
-
 ## Sjekkliste for gjennomgang
 
 - [ ] Er budskapet klart og lett å forstå?
