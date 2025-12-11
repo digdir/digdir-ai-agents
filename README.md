@@ -31,7 +31,7 @@ gh copilot chat
 
 
 ## Future development
-* The initial commit is focused on Digdir and [Altinn docs](https://github.com/Altinn/altinn-studio-docs). 
+* The initial commits focuses on Digdir and [Altinn docs](https://github.com/Altinn/altinn-studio-docs). 
 The plan is to move e.g. the dictionary and the specific writing-guide into the docs repo, and get the agent/tooling to 
 use those files, leaving this as a more generic baseline that is better suited to re-use in other scenarios.
  
