@@ -62,20 +62,16 @@ Ask clarifying questions about:
 ## IMPORTANT: Read Reference Files First
 
 **ALWAYS read these files before starting work:**
-1. Read `.github/TERMINOLOGY.md` for approved terminology and translations
-2. Read `.github/WRITING-GUIDE.md` for comprehensive style guidelines
+1. Read `.workflows/documentation/TERMINOLOGY.md` for approved terminology and translations
+2. Read `.workflows/documentation/WRITING-GUIDE.md` for comprehensive style guidelines
 3. Apply these standards consistently throughout your work
 
 
 ## Terminology Consistency
 Refer to local `TERMINOLOGY.md` for:
-
-**Terms to avoid:**
-- "Stateless app" → Use "Instansløst skjema"
-- "Prefill/pre-fill" → Use "Forhåndsutfylling"
-- "Alert komponent" → Use "Varslingskomponent"
-- "Master/slave" → Use "Primær/sekundær"
-- "Whitelist/blacklist" → Use "Tilgangsliste/blokkeringsliste"
+- Approved Norwegian terms vs. English equivalents
+- Terms NOT to translate (Dialogporten, Altinn, Maskinporten)
+- Preferred technical translations
 
 Always deliver documentation that empowers readers to successfully complete their intended tasks with confidence.
 

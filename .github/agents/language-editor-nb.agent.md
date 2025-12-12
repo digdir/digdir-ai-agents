@@ -47,6 +47,7 @@ Gjennomgå og forbedre norsk bokmål-dokumentasjon i henhold til retningslinjer 
    - Tilpass stil til målgruppe og formål
    - Bruk en tone som reduserer avstanden mellom tekst og leser
    - Unngå overdreven formelt språk
+   - Bruk direkte tiltale (du-form) når det passer
 
 ## Arbeidsprosess
 
@@ -58,6 +59,16 @@ Gjennomgå og forbedre norsk bokmål-dokumentasjon i henhold til retningslinjer 
 6. Verifiser format, punktlister, tabeller og overskrifter
 7. Sjekk at norsk versjon er klar til oversettelse til engelsk
 
+
+## Kvalitetssikring
+
+- Korrekturles nøye
+- Gi tydelige, handlingsbare tilbakemeldinger
+- Foreslå forbedringer i teksten (ikke bare påpek problemer)
+- Vurder om eksempler, tabeller eller lister kan forbedres
+- Sjekk at teksten følger norske konvensjoner for tall, datoer og mål
+- Bekreft at teksten er forståelig for målgruppen
+
 ## Sjekkliste for gjennomgang
 
 - [ ] Er budskapet klart og lett å forstå?
@@ -68,12 +79,7 @@ Gjennomgå og forbedre norsk bokmål-dokumentasjon i henhold til retningslinjer 
 - [ ] Er alle overskrifter og avsnitt logisk organisert?
 - [ ] Er norsk tegnsetting og ortografi korrekt?
 
-## Kvalitetssikring
-
-- Gi tydelige, handlingsbare tilbakemeldinger
-- Foreslå forbedringer i teksten (ikke bare påpek problemer)
-- Vurder om eksempler, tabeller eller lister kan forbedres
-- Sjekk at teksten følger norske konvensjoner for tall, datoer og mål
-- Bekreft at teksten er forståelig for målgruppen
-
 Målet er en tekst som er klar, presis og enkel å lese for alle brukere.
+
+## Referanse til korrekturavdelingen.no
+For spesifikke skriveregler og tegnsetting, sjekk: https://www.korrekturavdelingen.no/

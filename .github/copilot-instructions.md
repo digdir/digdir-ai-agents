@@ -24,7 +24,7 @@ This repository contains AI-assisted documentation workflows for creating high-q
 ### Primary Reference Files
 When working on documentation tasks, **always** refer to these files:
 
-**Common files (both AIs use these):**
+**Common files:**
 1. **`workflows/documentation/WRITING-GUIDE.md`** - Writing style and quality guidelines
 2. **`workflows/documentation/TERMINOLOGY.md`** - Approved terminology and translations
 
