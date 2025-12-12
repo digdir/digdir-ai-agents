@@ -1,11 +1,21 @@
 ﻿# CLAUDE.md
 
+## Claude: Primary Instructions  
+
+**If you are Claude, you MUST follow these instructions:**
+
+1. **Your primary workflow file** is `workflows/documentation/CLAUDE.md`
+2. **Your agent files** are located in `workflows/documentation/.claude/agents/`  
+3. **NEVER** use instructions from the `.github/` directory
+
+**Link hygiene requirements:** Always validate internal links and anchors before completing a task. Ensure the correct language prefix is used and verify that the destination heading exists. Run the same `hyperlink --check-anchors --sources content/ public/` command when available, or manually confirm the slug in the target document.
+
 ## Oversikt over repoet
 Dette er undermappen `/workflows/documentation`, som er rotmappen spesielt tilpasset for å skrive, oversette og forbedre prosadokumentasjon.
 
 ## Tilgjengelige oversettings- og skriveagenter
 - Bruk `technical-writer`-agenten for å forfatte tekniske dokumentasjonstekster
-- Bruk `copywriter-norsk` og `copywriter-english`-agentene for oversettelse og språkforbedring
+- Bruk `language-editor-nb` og `language-editor-en`-agentene for oversettelse og språkforbedring
 
 ## Veiledning for å løse GitHub issues som krever teknisk dokumentasjon i altinn-studio-docs
 Bruk undermappen `./repos` til å klone repo-er inn i (i nye undermapper), etter behov. For eksempel hvis du trenger å arbeide med både brukerdokumentasjon og se på kode fra et kode-repo.
@@ -17,8 +27,9 @@ Hoveddokumentasjonen som brukerne ser, ligger i repo [altinn-studio-docs](https:
 - Skriv primært på **norsk bokmål** (konservativ form)
 - Alt innhold må oversettes til engelsk
 - Følg `TERMINOLOGY.md` for godkjente oversettelser
-- Bruk copywriter-agenter proaktivt for språkkvalitet
+- Bruk language-agenter proaktivt for språkkvalitet
 - Følg Diátaxis strengt - explanation vs guide vs tutorial vs reference
+- Sørg for at interne lenker peker til riktig språk ved å bruke `/nb/`- eller `/en/`-prefiks
 
 
 ### Forberedelse og planlegging
@@ -59,9 +70,9 @@ Bruk **Diátaxis-modellen** for dokumentasjonstyper:
 - **Referanse (Reference)**: Informasjonsfokuserte, detaljerte spesifikasjoner
 
 ##### Kvalitetssikring av norsk tekst
-- Bruk copywriter-norsk agenten for språkvask:
+- Bruk language-editor-nb agenten for språkvask:
 ```
-Task med subagent_type: "copywriter-norsk"
+Task med subagent_type: "language-editor-nb"
 ```
 - Be om gjennomgang mot WRITING-GUIDE.md og TERMINOLOGY.md
 - Implementer forbedringsforslag
@@ -75,8 +86,9 @@ Task med subagent_type: "copywriter-norsk"
 ### Tekniske sjekker
 
 #### 8. PII-kontroll
-Bruk PII-verktøyet for å kontrollere at det kun er godkjent eksempel-data som benyttes. Oppdater dokumentet dersom du har benyttet ugyldige verdier. 
-Lovlige verdier er konfigurert i @./pii-permitted-data.config
+Bruk PII-verktøyet for å kontrollere at det kun er godkjent eksempel-data som benyttes. Erstatt med nye lovlige verdier dersom du har benyttet ugyldige verdier.
+
+Lovlige verdier er konfigurert i `pii-permitted-data.config`
 
 ```bash
 python utils/pii-check/pii-check.py --root-folder [sti]
@@ -109,12 +121,12 @@ Hoveddokumentasjonen for brukerne er bygd med Hugo (se instruksjoner i readme-fi
 ## Generell skriveveiledning
 VIKTIG: Bruk og følg disse retningslinjene når du arbeider med tekst (spesielt i repo-et for altinn-studio-docs)
 
-@./WRITING-GUIDE.md
+@WRITING-GUIDE.md
 
 ## Terminologi
 VIKTIG: Bruk og følg disse begrepene og oversettelsene
 
-@./TERMINOLOGY.md
+@TERMINOLOGY.md
 
 ## Kommandoer å huske
 

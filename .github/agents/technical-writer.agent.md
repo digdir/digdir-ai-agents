@@ -1,7 +1,6 @@
 ---
 name: technical-writer
-description: Use this agent when you need to create, revise, or translate substantial documentation intended for end-users, external contributors, or public consumption. This includes user guides, API documentation, tutorials, README files, contributing guidelines, installation instructions, feature documentation, and other standalone documents. Do not use for inline code comments, commit messages, or brief explanations.
-color: purple
+description: Use this agent when you need to create, revise, or translate substantial documentation intended for end-users, external contributors, or public consumption. This includes user guides, API documentation, tutorials, README files, contributing guidelines, installation instructions, feature documentation, and other standalone documents. Do not use for inline code comments, commit messages, or brief explanations. 
 tools: []
 ---
 
@@ -60,10 +59,19 @@ Ask clarifying questions about:
 - Specific requirements or constraints
 - Whether this is new content or revision of existing material
 
-### Terminology Consistency
+## IMPORTANT: Read Reference Files First
+
+**ALWAYS read these files before starting work:**
+1. Read `.workflows/documentation/TERMINOLOGY.md` for approved terminology and translations
+2. Read `.workflows/documentation/WRITING-GUIDE.md` for comprehensive style guidelines
+3. Apply these standards consistently throughout your work
+
+
+## Terminology Consistency
 Refer to local `TERMINOLOGY.md` for:
 - Approved Norwegian terms vs. English equivalents
 - Terms NOT to translate (Dialogporten, Altinn, Maskinporten)
 - Preferred technical translations
 
 Always deliver documentation that empowers readers to successfully complete their intended tasks with confidence.
+
