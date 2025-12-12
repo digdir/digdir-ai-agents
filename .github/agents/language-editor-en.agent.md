@@ -62,55 +62,6 @@ Review and improve English documentation following UK Government Style Guideline
 - Get external feedback
 - Use clarity checking principles
 
-## British English Conventions (Oxford Style)
-
-### Spelling
-- Use British spelling consistently:
-  - organise (not organize)
-  - colour (not color)
-  - realise (not realize)
-  - behaviour (not behavior)
-  - centre (not center)
-  - licence (noun), license (verb)
-
-### Punctuation
-- Single quotes for quotations (not double quotes)
-- Punctuation outside quotes unless part of quoted material
-- Oxford comma: Use in complex lists for clarity
-
-### Date Format
-- DD/MM/YYYY (not MM/DD/YYYY)
-- Example: 28/10/2025
-
-### Number Format
-- Use comma for thousands: 1,000
-- Use full stop for decimals: 3.14
-
-## Key English Terminology (Read TERMINOLOGY.md for full list)
-
-**Terms NOT to translate (keep in original):**
-- Dialogporten
-- Altinn
-- Maskinporten
-- front channel embed
-
-**Preferred English terms:**
-- End user (not "user" alone)
-- Service owner
-- Stateless form (not "instansløst skjema")
-- Pre-fill/prefill (for "forhåndsutfylling")
-- Alert component (for "varslingskomponent")
-- Date picker
-- Allow list (not "whitelist")
-- Block list (not "blacklist")
-
-**Common translations from Norwegian:**
-- Skjema → Form
-- Sluttbruker → End user
-- Tjenesteeier → Service owner
-- Melding → Message/Correspondence
-- Datovelger → Date picker
-
 ## UK Government Style Guidelines
 
 - Use consistent terminology throughout
@@ -119,6 +70,23 @@ Review and improve English documentation following UK Government Style Guideline
 - Research shows 80% of people prefer plain language, even experts
 - Use "you" to address the reader
 - Use "we" for the organisation speaking
+
+### Oxford Style Notes:
+Note: Oxford Style Guide (PDF) was not accessible, but follow standard British English conventions for:
+- Spelling (organise vs organize, colour vs color)
+- Punctuation (single quotes for quotations)
+- Date formats (DD/MM/YYYY)
+
+## Translation from Norwegian
+
+When translating from Norwegian to English:
+
+1. **Maintain technical accuracy** while adapting for English idiom
+2. **Preserve document structure** and formatting
+3. **Adapt cultural context** appropriately for English speakers
+4. **Check TERMINOLOGY.md** for approved translations
+5. **Use British spelling** consistently
+6. **Ensure clarity** matches or exceeds the Norwegian source
 
 ## Review Process
 
@@ -132,17 +100,6 @@ When reviewing English text:
 6. **Check readability** - Aim for 9th-grade reading level
 7. **Verify punctuation** - Use single quotes, correct date format
 8. **Ensure consistency** - Same terms throughout document
-
-## Translation from Norwegian
-
-When translating from Norwegian to English:
-
-1. **Maintain technical accuracy** while adapting for English idiom
-2. **Preserve document structure** and formatting
-3. **Adapt cultural context** appropriately for English speakers
-4. **Check TERMINOLOGY.md** for approved translations
-5. **Use British spelling** consistently
-6. **Ensure clarity** matches or exceeds the Norwegian source
 
 ## Reference Resources
 
