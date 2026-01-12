@@ -17,6 +17,40 @@ Dette er undermappen `/workflows/documentation`, som er rotmappen spesielt tilpa
 - Bruk `technical-writer`-agenten for å forfatte tekniske dokumentasjonstekster
 - Bruk `language-editor-nb` og `language-editor-en`-agentene for oversettelse og språkforbedring
 
+## Verktøy for kvalitetssikring
+
+### Borealis - AI-assistert språkforbedring (norsk)
+Bruk **refine-language**-skillen for å få språkforbedringsforslag på norsk tekst via den norske språkmodellen Borealis:
+
+```bash
+python .claude/skills/refine-language/scripts/borealis.py "<tekst som skal forbedres>"
+```
+
+**Merk:** Krever at LM Studio kjører lokalt med `borealis-4b-instruct-preview`-modellen lastet inn.
+
+### Doc-review - Human-in-the-loop kvalitetssikring
+Bruk doc-review MCP-verktøyet for å få menneskelig godkjenning av dokumentasjon:
+
+```
+mcp__doc-review__review_documentation med:
+- nb_file: sti til norsk fil (påkrevd)
+- en_file: sti til engelsk fil (valgfritt, for side-by-side sammenligning)
+- session_id: for å gjenoppta tidligere review (valgfritt)
+```
+
+Revieweren kan:
+- Se endringer med diff-markering
+- Sammenligne norsk og engelsk side-by-side
+- Redigere innhold direkte i nettleseren
+- Legge til kommentarer
+- Godkjenne eller avslå med tilbakemelding
+
+For å hente tilbakemelding fra en avslått review:
+```
+mcp__doc-review__get_review_feedback med:
+- session_id: eller nb_file for å finne sesjonen
+```
+
 ## Veiledning for å løse GitHub issues som krever teknisk dokumentasjon i altinn-studio-docs
 Bruk undermappen `./repos` til å klone repo-er inn i (i nye undermapper), etter behov. For eksempel hvis du trenger å arbeide med både brukerdokumentasjon og se på kode fra et kode-repo.
 
@@ -70,18 +104,43 @@ Bruk **Diátaxis-modellen** for dokumentasjonstyper:
 - **Referanse (Reference)**: Informasjonsfokuserte, detaljerte spesifikasjoner
 
 ##### Kvalitetssikring av norsk tekst
-- Bruk language-editor-nb agenten for språkvask:
+1. Bruk language-editor-nb agenten for språkvask:
+   ```
+   Task med subagent_type: "language-editor-nb"
+   ```
+2. Bruk Borealis for AI-assistert språkforbedring:
+   ```bash
+   python .claude/skills/refine-language/scripts/borealis.py "<tekst>"
+   ```
+3. Be om gjennomgang mot WRITING-GUIDE.md og TERMINOLOGY.md
+4. Implementer forbedringsforslag
+
+#### Sjekkpunkt 1: Godkjenning av norsk tekst
+**Før oversettelse**, send norsk versjon til menneskelig godkjenning:
+
 ```
-Task med subagent_type: "language-editor-nb"
+mcp__doc-review__review_documentation med:
+- nb_file: sti til norsk fil
 ```
-- Be om gjennomgang mot WRITING-GUIDE.md og TERMINOLOGY.md
-- Implementer forbedringsforslag
+
+Iterer basert på tilbakemeldinger til den norske teksten er godkjent. Dette sikrer at oversettelsen starter fra et kvalitetssikret utgangspunkt.
 
 #### Oversett til engelsk
 - Filnavn: `_index.en.md`
 - Behold samme struktur og weight
 - Tilpass til engelsk idiomatikk
 - Bruk godkjent terminologi fra TERMINOLOGY.md
+
+#### Sjekkpunkt 2: Godkjenning av begge versjoner
+Etter oversettelse, send begge versjoner til menneskelig godkjenning for sammenligning:
+
+```
+mcp__doc-review__review_documentation med:
+- nb_file: sti til norsk fil
+- en_file: sti til engelsk fil
+```
+
+Revieweren kan sammenligne norsk og engelsk side-by-side. Iterer basert på tilbakemeldinger til begge versjoner er godkjent.
 
 ### Tekniske sjekker
 
