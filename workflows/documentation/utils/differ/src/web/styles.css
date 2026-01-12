@@ -343,6 +343,39 @@ body {
   color: #ce9178;
 }
 
+/* Front-matter diff styling */
+.fm-line {
+  padding: 2px 0;
+  border-radius: 2px;
+  margin: 1px 0;
+}
+
+.fm-line-added {
+  background: var(--color-diff-added-bg);
+  border-left: 2px solid var(--color-diff-added-text);
+  padding-left: 6px;
+  margin-left: -6px;
+}
+
+.fm-line-removed {
+  background: var(--color-diff-removed-bg);
+  border-left: 2px solid var(--color-diff-removed-text);
+  padding-left: 6px;
+  margin-left: -6px;
+}
+
+.fm-line-modified {
+  background: var(--color-diff-modified-bg);
+  border-left: 2px solid #bb8009;
+  padding-left: 6px;
+  margin-left: -6px;
+}
+
+.fm-line-padding {
+  background: rgba(128, 128, 128, 0.1);
+  min-height: 20px;
+}
+
 /* Line numbered content */
 .line-numbered-content {
   font-family: var(--font-mono);

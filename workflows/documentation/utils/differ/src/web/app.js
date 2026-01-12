@@ -183,16 +183,23 @@ function render() {
   }
 
   // Render content with aligned diff (both old and new columns)
+  // Parse old front-matter from previous content for diff comparison
+  const nbOldFm = state.nb.previous ? parseFrontMatter(state.nb.previous).frontMatter : null;
+  const nbNewFm = state.nb.frontMatter;
+
   if (state.nb.alignedLines) {
-    renderAlignedContent(elements.oldNbMarkdown, elements.newNbMarkdown, state.nb.alignedLines, state.nb.frontMatter);
+    renderAlignedContent(elements.oldNbMarkdown, elements.newNbMarkdown, state.nb.alignedLines, nbOldFm, nbNewFm);
   } else {
     renderSimpleContent(elements.oldNbMarkdown, state.nb.previous, 'old');
     renderSimpleContent(elements.newNbMarkdown, state.nb.current, 'new');
   }
 
   if (state.en) {
+    const enOldFm = state.en.previous ? parseFrontMatter(state.en.previous).frontMatter : null;
+    const enNewFm = state.en.frontMatter;
+
     if (state.en.alignedLines) {
-      renderAlignedContent(elements.oldEnMarkdown, elements.newEnMarkdown, state.en.alignedLines, state.en.frontMatter);
+      renderAlignedContent(elements.oldEnMarkdown, elements.newEnMarkdown, state.en.alignedLines, enOldFm, enNewFm);
     } else {
       renderSimpleContent(elements.oldEnMarkdown, state.en.previous, 'old');
       renderSimpleContent(elements.newEnMarkdown, state.en.current, 'new');
@@ -234,6 +241,7 @@ function updateSimilarityBadge(element, similarity, isNew) {
 
 /**
  * Parse front matter from content
+ * Returns frontMatter as an object (parsed YAML-like format)
  */
 function parseFrontMatter(content) {
   if (!content) return { frontMatter: null, body: content || '' };
@@ -241,9 +249,31 @@ function parseFrontMatter(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   if (!match) return { frontMatter: null, body: content };
 
+  const frontMatterText = match[1];
+  const body = content.slice(match[0].length);
+
+  // Parse YAML-like format into object (key: value pairs)
+  const frontMatter = {};
+  const lines = frontMatterText.split('\n');
+
+  for (const line of lines) {
+    const colonIndex = line.indexOf(':');
+    if (colonIndex > 0) {
+      const key = line.slice(0, colonIndex).trim();
+      let value = line.slice(colonIndex + 1).trim();
+
+      // Try to parse as number or boolean
+      if (value === 'true') value = true;
+      else if (value === 'false') value = false;
+      else if (!isNaN(Number(value)) && value !== '') value = Number(value);
+
+      frontMatter[key] = value;
+    }
+  }
+
   return {
-    frontMatter: match[1],
-    body: content.slice(match[0].length)
+    frontMatter: Object.keys(frontMatter).length > 0 ? frontMatter : null,
+    body
   };
 }
 
@@ -272,6 +302,79 @@ function renderFrontMatter(frontMatter) {
   });
 
   return `<div class="front-matter"><div class="fm-delimiter">---</div>${lines.join('<br>')}<div class="fm-delimiter">---</div></div>`;
+}
+
+/**
+ * Render front matter with diff highlighting
+ */
+function renderFrontMatterWithDiff(oldFm, newFm, mode) {
+  // Convert to objects if needed
+  const oldObj = typeof oldFm === 'object' ? oldFm : {};
+  const newObj = typeof newFm === 'object' ? newFm : {};
+
+  // Get all keys from both
+  const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+
+  if (allKeys.size === 0) return '';
+
+  let lines = [];
+
+  for (const key of allKeys) {
+    const oldVal = oldObj[key];
+    const newVal = newObj[key];
+    const oldStr = oldVal !== undefined ? String(oldVal) : '';
+    const newStr = newVal !== undefined ? String(newVal) : '';
+
+    let lineClass = '';
+    let displayVal = '';
+
+    if (mode === 'old') {
+      if (oldVal === undefined) {
+        // Key doesn't exist in old - show as padding
+        lineClass = 'fm-line-padding';
+        displayVal = '';
+      } else if (newVal === undefined) {
+        // Key removed in new - show as removed
+        lineClass = 'fm-line-removed';
+        displayVal = oldStr;
+      } else if (oldStr !== newStr) {
+        // Value changed - show old value as modified
+        lineClass = 'fm-line-modified';
+        displayVal = oldStr;
+      } else {
+        // Unchanged
+        displayVal = oldStr;
+      }
+    } else {
+      // mode === 'new'
+      if (newVal === undefined) {
+        // Key removed in new - show as padding
+        lineClass = 'fm-line-padding';
+        displayVal = '';
+      } else if (oldVal === undefined) {
+        // Key added in new - show as added
+        lineClass = 'fm-line-added';
+        displayVal = newStr;
+      } else if (oldStr !== newStr) {
+        // Value changed - show new value as modified
+        lineClass = 'fm-line-modified';
+        displayVal = newStr;
+      } else {
+        // Unchanged
+        displayVal = newStr;
+      }
+    }
+
+    if (lineClass === 'fm-line-padding') {
+      lines.push(`<div class="fm-line ${lineClass}">&nbsp;</div>`);
+    } else {
+      const keyHtml = `<span class="fm-key">${escapeHtml(key)}:</span>`;
+      const valHtml = `<span class="fm-value">${escapeHtml(displayVal)}</span>`;
+      lines.push(`<div class="fm-line ${lineClass}">${keyHtml} ${valHtml}</div>`);
+    }
+  }
+
+  return `<div class="front-matter"><div class="fm-delimiter">---</div>${lines.join('')}<div class="fm-delimiter">---</div></div>`;
 }
 
 /**
@@ -338,8 +441,15 @@ function createDecorations(alignedLines) {
  * Render aligned content with proper diff visualization
  * This renders both old and new columns together, keeping lines aligned
  */
-function renderAlignedContent(oldElement, newElement, alignedLines, frontMatter) {
-  const fmHtml = renderFrontMatter(frontMatter);
+function renderAlignedContent(oldElement, newElement, alignedLines, oldFrontMatter, newFrontMatter) {
+  // If only one frontMatter provided (old API), use it for both
+  if (newFrontMatter === undefined) {
+    newFrontMatter = oldFrontMatter;
+  }
+
+  // Use diff-aware rendering when we have both old and new front-matter
+  const oldFmHtml = renderFrontMatterWithDiff(oldFrontMatter, newFrontMatter, 'old');
+  const newFmHtml = renderFrontMatterWithDiff(oldFrontMatter, newFrontMatter, 'new');
 
   let oldHtml = '<div class="line-numbered-content">';
   let newHtml = '<div class="line-numbered-content">';
@@ -366,8 +476,8 @@ function renderAlignedContent(oldElement, newElement, alignedLines, frontMatter)
   oldHtml += '</div>';
   newHtml += '</div>';
 
-  oldElement.innerHTML = fmHtml + oldHtml;
-  newElement.innerHTML = fmHtml + newHtml;
+  oldElement.innerHTML = oldFmHtml + oldHtml;
+  newElement.innerHTML = newFmHtml + newHtml;
 }
 
 /**
@@ -386,13 +496,23 @@ function renderLine(lineNumber, text, type, segments, mode) {
   else if (type === 'modified') lineClass += ' line-modified';
 
   let content;
+  let contentClass = 'line-content';
+
   if (segments && segments.length > 0) {
+    // For lines with segments (modified), add heading class here
+    // since renderLineWithSegments doesn't add it
     content = renderLineWithSegments(text || '', segments, mode);
+    const headingMatch = (text || '').match(/^(#{1,6})\s+/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      contentClass += ` md-heading md-h${level}`;
+    }
   } else {
+    // For lines without segments, renderMarkdownLine adds heading styling internally
     content = renderMarkdownLine(text || '');
   }
 
-  return `<div class="${lineClass}"><span class="line-number">${lineNumDisplay}</span><span class="line-content">${content}</span></div>`;
+  return `<div class="${lineClass}"><span class="line-number">${lineNumDisplay}</span><span class="${contentClass}">${content}</span></div>`;
 }
 
 /**
@@ -557,6 +677,17 @@ async function toggleEditor(lang) {
         enEdited = true;
       }
 
+      // Parse front-matter from both old and new content
+      const { frontMatter: newFrontMatter } = parseFrontMatter(newContent);
+      const { frontMatter: oldFrontMatter } = parseFrontMatter(previousContent || '');
+
+      // Update state with new front-matter
+      if (lang === 'nb') {
+        state.nb.frontMatter = newFrontMatter;
+      } else {
+        state.en.frontMatter = newFrontMatter;
+      }
+
       // Recompute diff between previous (original) and current (edited) content
       if (previousContent) {
         try {
@@ -583,8 +714,8 @@ async function toggleEditor(lang) {
               updateSimilarityBadge(elements.enSimilarity, similarity, false);
             }
 
-            // Re-render with new aligned diff
-            renderAlignedContent(oldMarkdownView, markdownView, alignedLines, frontMatter);
+            // Re-render with new aligned diff - old FM for old column, new FM for new column
+            renderAlignedContent(oldMarkdownView, markdownView, alignedLines, oldFrontMatter, newFrontMatter);
           } else {
             // Fallback to simple render
             renderSimpleContent(markdownView, newContent, 'new');
