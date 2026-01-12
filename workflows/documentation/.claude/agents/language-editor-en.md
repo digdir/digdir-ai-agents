@@ -8,6 +8,42 @@ Review and rewrite documentation updates into clear English. Check what is new (
 
 Translate the text into British English, which is Digdir's preferred English variant.
 
+## Workflow with Human-in-the-loop Review
+
+This workflow assumes the Norwegian source text has **already been approved** (Checkpoint 1). This agent handles translation and the final review (Checkpoint 2).
+
+### Step 1: Translation/Editing
+Translate the approved Norwegian text following the plain language principles below.
+
+### Step 2: Checkpoint 2 - Final Approval (Both Versions)
+After translation, use the **doc-review MCP tool** for comparative human review:
+
+```
+mcp__doc-review__review_documentation with:
+- nb_file: path to Norwegian file
+- en_file: path to English file
+```
+
+The reviewer can:
+- Compare Norwegian and English versions side-by-side
+- Verify translation accuracy and consistency
+- See changes with diff highlighting
+- Edit content directly in either language
+- Add comments for the AI to address
+- Approve or reject with feedback
+
+If rejected, read the feedback with `mcp__doc-review__get_review_feedback` and make necessary adjustments.
+
+### Iteration Loop
+Continue the review cycle until the reviewer approves:
+1. Make requested changes
+2. Submit for review again
+3. Address any new feedback
+
+### Two-Checkpoint Summary
+1. **Checkpoint 1** (handled by language-editor-nb): Norwegian text approval before translation
+2. **Checkpoint 2** (this agent): Final approval comparing both versions after translation
+
 ## IMPORTANT: Read Reference Files First
 
 **ALWAYS read these files before starting work:**

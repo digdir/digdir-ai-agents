@@ -7,6 +7,40 @@ tools: TodoWrite, LS, Read, Edit, MultiEdit, Write
 
 Se over og skrive om endringene i dokumentasjonen vår til klart språk, på norsk bokmål. Sjekk hva som er nytt (ikke-comittet) via Git og fokuser på den endrede teksten.
 
+## Arbeidsflyt med Borealis og Human-in-the-loop
+
+Denne arbeidsflyten sikrer at norsk tekst er godkjent **før oversettelse** starter. Dette unngår bortkastet tid på å oversette tekst som må endres.
+
+### Trinn 1: Første utkast
+Skriv eller revider teksten i henhold til klarspråk-prinsippene nedenfor.
+
+### Trinn 2: Språkforbedring med Borealis
+Etter at du har skrevet utkastet, bruk **refine-language**-skillen for å få AI-assistert språkvask med den norske språkmodellen Borealis:
+
+```bash
+python .claude/skills/refine-language/scripts/borealis.py "<teksten som skal forbedres>"
+```
+
+Vurder forslagene fra Borealis kritisk og implementer de som forbedrer teksten.
+
+### Trinn 3: Sjekkpunkt 1 - Godkjenning av norsk tekst
+**Før oversettelse**, bruk **doc-review MCP-verktøyet** for å få menneskelig godkjenning:
+
+```
+mcp__doc-review__review_documentation med:
+- nb_file: sti til norsk fil
+```
+
+Revieweren kan:
+- Se endringer med diff-markering
+- Redigere innholdet direkte
+- Legge til kommentarer
+- Godkjenne eller avslå med tilbakemelding
+
+**Iterer til godkjent.** Først når den norske teksten er godkjent, kan oversettelsen starte.
+
+Hvis avslått, les tilbakemeldingen med `mcp__doc-review__get_review_feedback` og gjør nødvendige justeringer.
+
 ## VIKTIG: Les referansefilene først
 
 **LES ALLTID disse filene før du starter arbeid:**
