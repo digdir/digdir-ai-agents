@@ -9,7 +9,6 @@ let nbEditor = null;
 let enEditor = null;
 let nbEdited = false;
 let enEdited = false;
-let showingEn = false;
 let showDiffDecorations = true;
 let nbDecorations = [];
 let enDecorations = [];
@@ -17,8 +16,6 @@ let enDecorations = [];
 // DOM Elements
 const elements = {
   sessionInfo: document.getElementById('sessionInfo'),
-  roundBadge: document.getElementById('roundBadge'),
-  toggleViewBtn: document.getElementById('toggleViewBtn'),
   columnsContainer: document.getElementById('columnsContainer'),
   colOldNb: document.getElementById('colOldNb'),
   colNewNb: document.getElementById('colNewNb'),
@@ -40,7 +37,6 @@ const elements = {
   commentsList: document.getElementById('commentsList'),
   newComment: document.getElementById('newComment'),
   addCommentBtn: document.getElementById('addCommentBtn'),
-  toggleCommentsBtn: document.getElementById('toggleCommentsBtn'),
   commentsPanel: document.getElementById('commentsPanel'),
   approveBtn: document.getElementById('approveBtn'),
   rejectBtn: document.getElementById('rejectBtn'),
@@ -110,24 +106,12 @@ async function fetchState() {
  * Setup event listeners
  */
 function setupEventListeners() {
-  // Toggle view (NB/EN on smaller screens)
-  elements.toggleViewBtn.addEventListener('click', () => {
-    showingEn = !showingEn;
-    elements.columnsContainer.classList.toggle('show-en', showingEn);
-    elements.toggleViewBtn.textContent = showingEn ? 'Vis norsk' : 'Vis engelsk';
-  });
-
   // Edit buttons
   elements.editNbBtn.addEventListener('click', () => toggleEditor('nb'));
   elements.editEnBtn.addEventListener('click', () => toggleEditor('en'));
 
   // Comments
   elements.addCommentBtn.addEventListener('click', addComment);
-  elements.toggleCommentsBtn.addEventListener('click', () => {
-    elements.commentsPanel.classList.toggle('collapsed');
-    elements.toggleCommentsBtn.textContent =
-      elements.commentsPanel.classList.contains('collapsed') ? 'Vis' : 'Skjul';
-  });
 
   // Approve/Reject - no popup, uses inline comment
   elements.approveBtn.addEventListener('click', handleApprove);
@@ -187,7 +171,6 @@ function render() {
 
   // Update header
   elements.sessionInfo.textContent = `Sesjon: ${state.sessionId}`;
-  elements.roundBadge.textContent = `Runde ${state.currentRound}`;
 
   // Update file paths
   elements.nbFilePath.textContent = `NB: ${state.nb.filePath}`;
@@ -219,7 +202,6 @@ function render() {
   } else {
     elements.colOldEn.classList.add('hidden');
     elements.colNewEn.classList.add('hidden');
-    elements.toggleViewBtn.classList.add('hidden');
     elements.columnsContainer.classList.add('mode-nb-only');
   }
 
