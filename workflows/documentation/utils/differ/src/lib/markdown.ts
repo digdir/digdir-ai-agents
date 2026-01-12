@@ -16,6 +16,7 @@ export interface MarkdownSection {
 
 export interface ParsedMarkdown {
   frontMatter: Record<string, unknown> | null;
+  body: string;
   sections: MarkdownSection[];
   rawContent: string;
 }
@@ -125,6 +126,7 @@ export function parseMarkdownSections(content: string): ParsedMarkdown {
 
   return {
     frontMatter,
+    body,
     sections,
     rawContent: content
   };

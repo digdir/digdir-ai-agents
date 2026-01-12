@@ -785,3 +785,29 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
 }
+
+/* Monaco editor diff decorations */
+.monaco-diff-added-line {
+  background: var(--color-diff-added-bg) !important;
+}
+
+.monaco-diff-modified-line {
+  background: var(--color-diff-modified-bg) !important;
+}
+
+.monaco-diff-added-glyph {
+  background: var(--color-diff-added-text);
+  width: 4px !important;
+  margin-left: 2px;
+}
+
+.monaco-diff-modified-glyph {
+  background: #bb8009;
+  width: 4px !important;
+  margin-left: 2px;
+}
+
+.monaco-diff-inserted-text {
+  background: rgba(35, 134, 54, 0.4) !important;
+  border-radius: 2px;
+}

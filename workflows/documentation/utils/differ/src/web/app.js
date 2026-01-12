@@ -10,6 +10,9 @@ let enEditor = null;
 let nbEdited = false;
 let enEdited = false;
 let showingEn = false;
+let showDiffDecorations = true;
+let nbDecorations = [];
+let enDecorations = [];
 
 // DOM Elements
 const elements = {
@@ -196,7 +199,7 @@ function render() {
     updateSimilarityBadge(elements.enSimilarity, state.en.similarity, !state.en.previous);
   }
 
-  // Render content with aligned diff
+  // Render content with aligned diff (both old and new columns)
   if (state.nb.alignedLines) {
     renderAlignedContent(elements.oldNbMarkdown, elements.newNbMarkdown, state.nb.alignedLines, state.nb.frontMatter);
   } else {
@@ -287,6 +290,66 @@ function renderFrontMatter(frontMatter) {
   });
 
   return `<div class="front-matter"><div class="fm-delimiter">---</div>${lines.join('<br>')}<div class="fm-delimiter">---</div></div>`;
+}
+
+/**
+ * Create Monaco decorations from aligned lines
+ */
+function createDecorations(alignedLines) {
+  const decorations = [];
+  let editorLineNum = 0;
+
+  for (const line of alignedLines) {
+    const { type, newLineNumber, segments } = line;
+
+    // Skip lines that don't exist in the new content (removed lines)
+    if (type === 'removed') {
+      continue;
+    }
+
+    editorLineNum++;
+
+    if (type === 'added') {
+      decorations.push({
+        range: new monaco.Range(editorLineNum, 1, editorLineNum, 1),
+        options: {
+          isWholeLine: true,
+          className: 'monaco-diff-added-line',
+          glyphMarginClassName: 'monaco-diff-added-glyph'
+        }
+      });
+    } else if (type === 'modified') {
+      decorations.push({
+        range: new monaco.Range(editorLineNum, 1, editorLineNum, 1),
+        options: {
+          isWholeLine: true,
+          className: 'monaco-diff-modified-line',
+          glyphMarginClassName: 'monaco-diff-modified-glyph'
+        }
+      });
+
+      // Add inline decorations for character-level changes
+      if (segments) {
+        let charPos = 1;
+        for (const segment of segments) {
+          if (segment.operation === 1) { // INSERT
+            decorations.push({
+              range: new monaco.Range(editorLineNum, charPos, editorLineNum, charPos + segment.text.length),
+              options: {
+                inlineClassName: 'monaco-diff-inserted-text'
+              }
+            });
+          }
+          // Only count characters that are in the new content
+          if (segment.operation !== -1) { // Not DELETE
+            charPos += segment.text.length;
+          }
+        }
+      }
+    }
+  }
+
+  return decorations;
 }
 
 /**
@@ -483,32 +546,75 @@ function renderComments() {
 /**
  * Toggle editor for a language
  */
-function toggleEditor(lang) {
+async function toggleEditor(lang) {
   const container = lang === 'nb' ? elements.nbEditorContainer : elements.enEditorContainer;
   const markdownView = lang === 'nb' ? elements.newNbMarkdown : elements.newEnMarkdown;
+  const oldMarkdownView = lang === 'nb' ? elements.oldNbMarkdown : elements.oldEnMarkdown;
   const button = lang === 'nb' ? elements.editNbBtn : elements.editEnBtn;
   const content = lang === 'nb' ? state.nb.current : state.en?.current;
+  const frontMatter = lang === 'nb' ? state.nb.frontMatter : state.en?.frontMatter;
+  const previousContent = lang === 'nb' ? state.nb.previous : state.en?.previous;
 
   const isEditing = !container.classList.contains('hidden');
 
   if (isEditing) {
-    // Close editor
+    // Close editor - return to preview mode
     container.classList.add('hidden');
     markdownView.classList.remove('hidden');
     button.textContent = 'Rediger';
 
-    // Update markdown view with editor content
+    // Get content from editor and update state
     const editor = lang === 'nb' ? nbEditor : enEditor;
     if (editor) {
       const newContent = editor.getValue();
       if (lang === 'nb') {
         state.nb.current = newContent;
-        nbEdited = newContent !== state.nb.previous;
+        nbEdited = true;
       } else {
         state.en.current = newContent;
-        enEdited = newContent !== state.en?.previous;
+        enEdited = true;
       }
-      renderSimpleContent(markdownView, newContent, 'new');
+
+      // Recompute diff between previous (original) and current (edited) content
+      if (previousContent) {
+        try {
+          const response = await fetch('/api/compute-diff', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              oldContent: previousContent,
+              newContent: newContent
+            })
+          });
+
+          if (response.ok) {
+            const { alignedLines, similarity } = await response.json();
+
+            // Update state with new diff
+            if (lang === 'nb') {
+              state.nb.alignedLines = alignedLines;
+              state.nb.similarity = similarity;
+              updateSimilarityBadge(elements.nbSimilarity, similarity, false);
+            } else {
+              state.en.alignedLines = alignedLines;
+              state.en.similarity = similarity;
+              updateSimilarityBadge(elements.enSimilarity, similarity, false);
+            }
+
+            // Re-render with new aligned diff
+            renderAlignedContent(oldMarkdownView, markdownView, alignedLines, frontMatter);
+          } else {
+            // Fallback to simple render
+            renderSimpleContent(markdownView, newContent, 'new');
+          }
+        } catch (error) {
+          console.error('Failed to compute diff:', error);
+          renderSimpleContent(markdownView, newContent, 'new');
+        }
+      } else {
+        // No previous content (new file), just render the new content
+        renderSimpleContent(markdownView, newContent, 'new');
+      }
     }
   } else {
     // Open editor
@@ -526,7 +632,8 @@ function toggleEditor(lang) {
         wordWrap: 'on',
         lineNumbers: 'on',
         fontSize: 14,
-        automaticLayout: true
+        automaticLayout: true,
+        glyphMargin: true
       });
     } else if (lang === 'en' && !enEditor) {
       enEditor = monaco.editor.create(container, {
@@ -537,11 +644,24 @@ function toggleEditor(lang) {
         wordWrap: 'on',
         lineNumbers: 'on',
         fontSize: 14,
-        automaticLayout: true
+        automaticLayout: true,
+        glyphMargin: true
       });
     } else {
       const editor = lang === 'nb' ? nbEditor : enEditor;
       editor?.setValue(content);
+    }
+
+    // Apply diff decorations to the editor
+    if (showDiffDecorations && alignedLines) {
+      const editor = lang === 'nb' ? nbEditor : enEditor;
+      const decorations = lang === 'nb' ? nbDecorations : enDecorations;
+      const newDecorations = editor.deltaDecorations(decorations, createDecorations(alignedLines));
+      if (lang === 'nb') {
+        nbDecorations = newDecorations;
+      } else {
+        enDecorations = newDecorations;
+      }
     }
   }
 }

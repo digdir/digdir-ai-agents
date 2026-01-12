@@ -102,6 +102,7 @@ export function computeLineDiff(oldText: string, newText: string): LineDiff[] {
   }
 
   // Post-process to identify modified lines (removed + added pairs)
+  // Only treat as modified if the lines are actually similar (>30% similarity)
   const processed: LineDiff[] = [];
   let i = 0;
 
@@ -109,19 +110,34 @@ export function computeLineDiff(oldText: string, newText: string): LineDiff[] {
     const current = result[i];
     const next = result[i + 1];
 
-    // If we have a removed followed by added, treat as modified
+    // If we have a removed followed by added, check if they're similar enough to be "modified"
     if (current.type === 'removed' && next?.type === 'added') {
-      const charDiff = computeDiff(current.oldText || '', next.newText || '');
-      processed.push({
-        lineNumber: processed.length + 1,
-        oldLineNumber: current.oldLineNumber,
-        newLineNumber: next.newLineNumber,
-        type: 'modified',
-        oldText: current.oldText,
-        newText: next.newText,
-        segments: charDiff
-      });
-      i += 2;
+      const oldText = current.oldText || '';
+      const newText = next.newText || '';
+      const similarity = calculateSimilarity(oldText, newText);
+
+      // Only treat as modified if similarity is above threshold (30%)
+      // This prevents unrelated lines from being paired incorrectly
+      if (similarity >= 30) {
+        const charDiff = computeDiff(oldText, newText);
+        processed.push({
+          lineNumber: processed.length + 1,
+          oldLineNumber: current.oldLineNumber,
+          newLineNumber: next.newLineNumber,
+          type: 'modified',
+          oldText: oldText,
+          newText: newText,
+          segments: charDiff
+        });
+        i += 2;
+      } else {
+        // Lines are too different - treat as separate remove/add
+        processed.push({
+          ...current,
+          lineNumber: processed.length + 1
+        });
+        i++;
+      }
     } else {
       processed.push({
         ...current,
@@ -134,11 +150,257 @@ export function computeLineDiff(oldText: string, newText: string): LineDiff[] {
   return processed;
 }
 
+interface HeadingInfo {
+  lineIndex: number;
+  text: string;
+  level: number;
+}
+
 /**
- * Create aligned lines for side-by-side display
- * Inserts padding lines so that matching content aligns horizontally
+ * Extract headings from text with their line positions
+ */
+function extractHeadings(lines: string[]): HeadingInfo[] {
+  const headings: HeadingInfo[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^(#{1,6})\s+(.+)$/);
+    if (match) {
+      headings.push({
+        lineIndex: i,
+        text: match[2].trim(),
+        level: match[1].length
+      });
+    }
+  }
+  return headings;
+}
+
+/**
+ * Match headings between old and new documents
+ * Returns pairs of matched heading indices
+ */
+function matchHeadings(oldHeadings: HeadingInfo[], newHeadings: HeadingInfo[]): Map<number, number> {
+  const matches = new Map<number, number>();
+  const usedNew = new Set<number>();
+
+  for (let oi = 0; oi < oldHeadings.length; oi++) {
+    const oldH = oldHeadings[oi];
+    let bestMatch = -1;
+    let bestScore = 0;
+
+    for (let ni = 0; ni < newHeadings.length; ni++) {
+      if (usedNew.has(ni)) continue;
+      const newH = newHeadings[ni];
+
+      // Must be same level
+      if (oldH.level !== newH.level) continue;
+
+      // Calculate similarity of heading text
+      const similarity = calculateSimilarity(oldH.text, newH.text);
+      if (similarity > bestScore && similarity >= 50) {
+        bestScore = similarity;
+        bestMatch = ni;
+      }
+    }
+
+    if (bestMatch >= 0) {
+      matches.set(oi, bestMatch);
+      usedNew.add(bestMatch);
+    }
+  }
+
+  return matches;
+}
+
+/**
+ * Create aligned lines for side-by-side display with heading-based alignment
+ * First aligns headings, then fills in content between them
  */
 export function createAlignedLines(oldText: string, newText: string): AlignedLine[] {
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
+
+  const oldHeadings = extractHeadings(oldLines);
+  const newHeadings = extractHeadings(newLines);
+  const headingMatches = matchHeadings(oldHeadings, newHeadings);
+
+  // Build aligned output by processing sections between headings
+  const aligned: AlignedLine[] = [];
+
+  // Create section boundaries (heading positions + end)
+  const oldSections = [...oldHeadings.map(h => h.lineIndex), oldLines.length];
+  const newSections = [...newHeadings.map(h => h.lineIndex), newLines.length];
+
+  let oldPos = 0;
+  let newPos = 0;
+  let oldHeadingIdx = 0;
+  let newHeadingIdx = 0;
+
+  while (oldPos < oldLines.length || newPos < newLines.length) {
+    // Find next matched heading pair
+    let nextOldHeading = -1;
+    let nextNewHeading = -1;
+
+    for (let oi = oldHeadingIdx; oi < oldHeadings.length; oi++) {
+      if (headingMatches.has(oi)) {
+        nextOldHeading = oi;
+        nextNewHeading = headingMatches.get(oi)!;
+        break;
+      }
+    }
+
+    if (nextOldHeading >= 0) {
+      // Process content before the matched heading
+      const oldHeadingLine = oldHeadings[nextOldHeading].lineIndex;
+      const newHeadingLine = newHeadings[nextNewHeading].lineIndex;
+
+      // Get content before heading
+      const oldContentBefore = oldLines.slice(oldPos, oldHeadingLine);
+      const newContentBefore = newLines.slice(newPos, newHeadingLine);
+
+      // Diff and align content before heading
+      if (oldContentBefore.length > 0 || newContentBefore.length > 0) {
+        const contentDiff = computeLineDiff(
+          oldContentBefore.join('\n'),
+          newContentBefore.join('\n')
+        );
+        addDiffToAligned(aligned, contentDiff, oldPos, newPos);
+      }
+
+      // Calculate how many padding lines needed to align heading
+      const oldAlignedCount = countAlignedLinesFor('old', aligned, oldPos, oldHeadingLine);
+      const newAlignedCount = countAlignedLinesFor('new', aligned, newPos, newHeadingLine);
+      const paddingNeeded = Math.abs(oldAlignedCount - newAlignedCount);
+
+      // Add padding to shorter side
+      for (let p = 0; p < paddingNeeded; p++) {
+        if (oldAlignedCount < newAlignedCount) {
+          aligned.push({
+            type: 'padding',
+            oldLineNumber: null,
+            newLineNumber: null,
+            oldText: null,
+            newText: null
+          });
+        }
+      }
+
+      // Add the matched heading line
+      const oldHeadingText = oldLines[oldHeadingLine];
+      const newHeadingText = newLines[newHeadingLine];
+      const headingSimilarity = calculateSimilarity(oldHeadingText, newHeadingText);
+
+      if (headingSimilarity === 100) {
+        aligned.push({
+          type: 'unchanged',
+          oldLineNumber: oldHeadingLine + 1,
+          newLineNumber: newHeadingLine + 1,
+          oldText: oldHeadingText,
+          newText: newHeadingText
+        });
+      } else {
+        aligned.push({
+          type: 'modified',
+          oldLineNumber: oldHeadingLine + 1,
+          newLineNumber: newHeadingLine + 1,
+          oldText: oldHeadingText,
+          newText: newHeadingText,
+          segments: computeDiff(oldHeadingText, newHeadingText)
+        });
+      }
+
+      oldPos = oldHeadingLine + 1;
+      newPos = newHeadingLine + 1;
+      oldHeadingIdx = nextOldHeading + 1;
+      newHeadingIdx = nextNewHeading + 1;
+    } else {
+      // No more matched headings, process remaining content
+      const oldRemaining = oldLines.slice(oldPos);
+      const newRemaining = newLines.slice(newPos);
+
+      if (oldRemaining.length > 0 || newRemaining.length > 0) {
+        const remainingDiff = computeLineDiff(
+          oldRemaining.join('\n'),
+          newRemaining.join('\n')
+        );
+        addDiffToAligned(aligned, remainingDiff, oldPos, newPos);
+      }
+      break;
+    }
+  }
+
+  return aligned;
+}
+
+/**
+ * Add diff results to aligned array
+ */
+function addDiffToAligned(
+  aligned: AlignedLine[],
+  diffs: LineDiff[],
+  oldStartLine: number,
+  newStartLine: number
+): void {
+  for (const diff of diffs) {
+    if (diff.type === 'unchanged') {
+      aligned.push({
+        type: 'unchanged',
+        oldLineNumber: diff.oldLineNumber !== null ? diff.oldLineNumber + oldStartLine : null,
+        newLineNumber: diff.newLineNumber !== null ? diff.newLineNumber + newStartLine : null,
+        oldText: diff.oldText || null,
+        newText: diff.newText || null
+      });
+    } else if (diff.type === 'modified') {
+      aligned.push({
+        type: 'modified',
+        oldLineNumber: diff.oldLineNumber !== null ? diff.oldLineNumber + oldStartLine : null,
+        newLineNumber: diff.newLineNumber !== null ? diff.newLineNumber + newStartLine : null,
+        oldText: diff.oldText || null,
+        newText: diff.newText || null,
+        segments: diff.segments
+      });
+    } else if (diff.type === 'removed') {
+      aligned.push({
+        type: 'removed',
+        oldLineNumber: diff.oldLineNumber !== null ? diff.oldLineNumber + oldStartLine : null,
+        newLineNumber: null,
+        oldText: diff.oldText || null,
+        newText: null
+      });
+    } else if (diff.type === 'added') {
+      aligned.push({
+        type: 'added',
+        oldLineNumber: null,
+        newLineNumber: diff.newLineNumber !== null ? diff.newLineNumber + newStartLine : null,
+        oldText: null,
+        newText: diff.newText || null
+      });
+    }
+  }
+}
+
+/**
+ * Count lines in aligned array for a side (old or new)
+ */
+function countAlignedLinesFor(
+  side: 'old' | 'new',
+  aligned: AlignedLine[],
+  startLine: number,
+  endLine: number
+): number {
+  let count = 0;
+  for (const line of aligned) {
+    const lineNum = side === 'old' ? line.oldLineNumber : line.newLineNumber;
+    if (lineNum !== null && lineNum >= startLine + 1 && lineNum <= endLine) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Create simple aligned lines without heading-based alignment (fallback)
+ */
+export function createSimpleAlignedLines(oldText: string, newText: string): AlignedLine[] {
   const lineDiffs = computeLineDiff(oldText, newText);
   const aligned: AlignedLine[] = [];
 

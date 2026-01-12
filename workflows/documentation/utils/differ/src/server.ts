@@ -179,6 +179,27 @@ export async function startReviewServer(
     }
   });
 
+  app.post('/api/compute-diff', async (req, res) => {
+    try {
+      const { oldContent, newContent } = req.body;
+
+      if (typeof oldContent !== 'string' || typeof newContent !== 'string') {
+        return res.status(400).json({ error: 'oldContent and newContent are required strings' });
+      }
+
+      // Strip front-matter before computing diff
+      const oldParsed = parseMarkdownSections(oldContent);
+      const newParsed = parseMarkdownSections(newContent);
+
+      const alignedLines = createAlignedLines(oldParsed.body, newParsed.body);
+      const similarity = calculateSimilarity(oldParsed.body, newParsed.body);
+
+      res.json({ alignedLines, similarity });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   // WebSocket handling
   wss.on('connection', (ws) => {
     wsClients.add(ws);
@@ -274,38 +295,40 @@ async function buildReviewState(review: ReviewState) {
     enPrevious = await getPreviousVersion(gitModule, request.enFilePath);
   }
 
-  // Compute diffs and aligned lines
-  const nbDiff = nbPrevious
-    ? computeLineDiff(nbPrevious.content, nbCurrent)
-    : [];
-
-  const nbAlignedLines = nbPrevious
-    ? createAlignedLines(nbPrevious.content, nbCurrent)
-    : null;
-
-  const enDiff = enPrevious && enCurrent
-    ? computeLineDiff(enPrevious.content, enCurrent)
-    : [];
-
-  const enAlignedLines = enPrevious && enCurrent
-    ? createAlignedLines(enPrevious.content, enCurrent)
-    : null;
-
-  // Parse sections for alignment
+  // Parse sections to extract front-matter and body separately
   const nbSections = parseMarkdownSections(nbCurrent);
+  const nbPrevSections = nbPrevious ? parseMarkdownSections(nbPrevious.content) : null;
   const enSections = enCurrent ? parseMarkdownSections(enCurrent) : null;
+  const enPrevSections = enPrevious ? parseMarkdownSections(enPrevious.content) : null;
+
+  // Compute diffs and aligned lines using BODY only (without front-matter)
+  const nbDiff = nbPrevSections
+    ? computeLineDiff(nbPrevSections.body, nbSections.body)
+    : [];
+
+  const nbAlignedLines = nbPrevSections
+    ? createAlignedLines(nbPrevSections.body, nbSections.body)
+    : null;
+
+  const enDiff = enPrevSections && enSections
+    ? computeLineDiff(enPrevSections.body, enSections.body)
+    : [];
+
+  const enAlignedLines = enPrevSections && enSections
+    ? createAlignedLines(enPrevSections.body, enSections.body)
+    : null;
 
   const alignedSections = enSections
     ? alignSections(nbSections.sections, enSections.sections)
     : null;
 
-  // Calculate similarity scores
-  const nbSimilarity = nbPrevious
-    ? calculateSimilarity(nbPrevious.content, nbCurrent)
+  // Calculate similarity scores (using body only)
+  const nbSimilarity = nbPrevSections
+    ? calculateSimilarity(nbPrevSections.body, nbSections.body)
     : 100;
 
-  const enSimilarity = enPrevious && enCurrent
-    ? calculateSimilarity(enPrevious.content, enCurrent)
+  const enSimilarity = enPrevSections && enSections
+    ? calculateSimilarity(enPrevSections.body, enSections.body)
     : 100;
 
   return {
