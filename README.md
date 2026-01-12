@@ -5,6 +5,12 @@ In its current incarnation, the focus is to explore various configurations of th
 
 The repo is organized in task domains under `/workflows`
 
+## Prerequisites
+
+- Install Git to clone the repository and manage updates. See the [Git download page](https://git-scm.com/downloads).
+- Ensure you have a recent terminal environment (PowerShell, bash, zsh) with access rights to install CLI tools.
+- Install the AI tool(s) you plan to use (for example Claude Code, GitHub Copilot, Gemini CLI, Crush, Qwen Coder). Follow each tool's official installation guide before running the workflows below.
+
 ## How to use
 Clone this repo, then navigate to the desired workflows-directory and start your AI tool from there.
 
