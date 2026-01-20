@@ -13,20 +13,46 @@
 ## Oversikt over repoet
 Dette er undermappen `/workflows/documentation`, som er rotmappen spesielt tilpasset for å skrive, oversette og forbedre prosadokumentasjon.
 
-## Tilgjengelige oversettings- og skriveagenter
-- Bruk `technical-writer`-agenten for å forfatte tekniske dokumentasjonstekster
-- Bruk `language-editor-nb` og `language-editor-en`-agentene for oversettelse og språkforbedring
+## Hurtigstart: Løse dokumentasjons-issues
+
+Bruk `/doc-workflow`-skillen for å starte en strukturert arbeidsflyt:
+
+```
+/doc-workflow https://github.com/Altinn/altinn-notifications/issues/1232
+```
+
+Denne skillen:
+1. Henter issue-informasjon
+2. Sjekker at verktøy er tilgjengelige
+3. Setter opp todo-liste med alle steg
+4. Starter arbeidet umiddelbart
+
+## Tilgjengelige agenter og skills
+
+### Agenter (via Task-verktøyet)
+- `technical-writer` - Forfatte tekniske dokumentasjonstekster
+- `language-editor-nb` - Språkvask og forbedring av norsk tekst
+- `language-editor-en` - Språkvask og forbedring av engelsk tekst
+
+### Skills (via /skill-navn)
+- `/doc-workflow` - Start dokumentasjonsarbeidsflyt for en issue
+- `/refine-language` - AI-assistert språkforbedring med Borealis
 
 ## Verktøy for kvalitetssikring
 
 ### Borealis - AI-assistert språkforbedring (norsk)
-Bruk **refine-language**-skillen for å få språkforbedringsforslag på norsk tekst via den norske språkmodellen Borealis:
 
+**Sjekk tilgjengelighet først:**
 ```bash
-python .claude/skills/refine-language/scripts/borealis.py "<tekst som skal forbedres>"
+python .claude/skills/refine-language/scripts/borealis.py --local --check
 ```
 
-**Merk:** Krever at LM Studio kjører lokalt med `borealis-4b-instruct-preview`-modellen lastet inn.
+**Forbedre tekst:**
+```bash
+python .claude/skills/refine-language/scripts/borealis.py --local "<tekst>"
+```
+
+**Viktig:** Hvis Borealis ikke er tilgjengelig, fortsett arbeidsflyten uten. Språkvask fra `language-editor-nb` er tilstrekkelig.
 
 ### Doc-review - Human-in-the-loop kvalitetssikring
 Bruk doc-review MCP-verktøyet for å få menneskelig godkjenning av dokumentasjon:
