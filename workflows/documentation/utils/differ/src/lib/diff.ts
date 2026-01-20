@@ -112,42 +112,54 @@ export function computeLineDiff(oldText: string, newText: string): LineDiff[] {
     }
   }
 
-  // Post-process to identify modified lines (removed + added pairs)
-  // Only treat as modified if the lines are actually similar (>30% similarity)
+  // Post-process to identify modified lines
+  // Handle both single removed+added pairs AND blocks of removed followed by added
   const processed: LineDiff[] = [];
   let i = 0;
 
   while (i < result.length) {
     const current = result[i];
-    const next = result[i + 1];
 
-    // If we have a removed followed by added, check if they're similar enough to be "modified"
-    if (current.type === 'removed' && next?.type === 'added') {
-      const oldText = current.oldText || '';
-      const newText = next.newText || '';
-      const similarity = calculateSimilarity(oldText, newText);
-
-      // Only treat as modified if similarity is above threshold (30%)
-      // This prevents unrelated lines from being paired incorrectly
-      if (similarity >= 30) {
-        const charDiff = computeDiff(oldText, newText);
-        processed.push({
-          lineNumber: processed.length + 1,
-          oldLineNumber: current.oldLineNumber,
-          newLineNumber: next.newLineNumber,
-          type: 'modified',
-          oldText: oldText,
-          newText: newText,
-          segments: charDiff
-        });
-        i += 2;
-      } else {
-        // Lines are too different - treat as separate remove/add
-        processed.push({
-          ...current,
-          lineNumber: processed.length + 1
-        });
+    // Check if we're starting a block of removed lines
+    if (current.type === 'removed') {
+      // Collect all consecutive removed lines
+      const removedBlock: LineDiff[] = [];
+      while (i < result.length && result[i].type === 'removed') {
+        removedBlock.push(result[i]);
         i++;
+      }
+
+      // Collect all consecutive added lines that follow
+      const addedBlock: LineDiff[] = [];
+      while (i < result.length && result[i].type === 'added') {
+        addedBlock.push(result[i]);
+        i++;
+      }
+
+      // If we have both removed and added blocks, try to match lines
+      if (removedBlock.length > 0 && addedBlock.length > 0) {
+        const matchedLines = matchLinesInBlocks(removedBlock, addedBlock);
+        for (const line of matchedLines) {
+          processed.push({
+            ...line,
+            lineNumber: processed.length + 1
+          });
+        }
+      } else {
+        // Only removed lines (no added), add them as-is
+        for (const line of removedBlock) {
+          processed.push({
+            ...line,
+            lineNumber: processed.length + 1
+          });
+        }
+        // Add any collected added lines (shouldn't happen, but just in case)
+        for (const line of addedBlock) {
+          processed.push({
+            ...line,
+            lineNumber: processed.length + 1
+          });
+        }
       }
     } else {
       processed.push({
@@ -159,6 +171,118 @@ export function computeLineDiff(oldText: string, newText: string): LineDiff[] {
   }
 
   return processed;
+}
+
+/**
+ * Match lines between removed and added blocks based on similarity
+ * Returns a merged list with modified, removed, and added lines
+ */
+function matchLinesInBlocks(
+  removedBlock: LineDiff[],
+  addedBlock: LineDiff[]
+): LineDiff[] {
+  const result: LineDiff[] = [];
+  const usedAdded = new Set<number>();
+
+  // For each removed line, find the best matching added line
+  const matches: Array<{ removedIdx: number; addedIdx: number; similarity: number }> = [];
+
+  for (let ri = 0; ri < removedBlock.length; ri++) {
+    const removed = removedBlock[ri];
+    const oldText = removed.oldText || '';
+
+    let bestMatch = -1;
+    let bestSimilarity = 0;
+
+    for (let ai = 0; ai < addedBlock.length; ai++) {
+      const added = addedBlock[ai];
+      const newText = added.newText || '';
+      const similarity = calculateSimilarity(oldText, newText);
+
+      if (similarity > bestSimilarity && similarity >= 30) {
+        bestSimilarity = similarity;
+        bestMatch = ai;
+      }
+    }
+
+    if (bestMatch >= 0) {
+      matches.push({ removedIdx: ri, addedIdx: bestMatch, similarity: bestSimilarity });
+    }
+  }
+
+  // Sort matches by similarity (highest first) and process greedily
+  matches.sort((a, b) => b.similarity - a.similarity);
+
+  const matchedRemoved = new Set<number>();
+  const matchedAdded = new Set<number>();
+  const finalMatches: Array<{ removedIdx: number; addedIdx: number }> = [];
+
+  for (const match of matches) {
+    if (!matchedRemoved.has(match.removedIdx) && !matchedAdded.has(match.addedIdx)) {
+      finalMatches.push({ removedIdx: match.removedIdx, addedIdx: match.addedIdx });
+      matchedRemoved.add(match.removedIdx);
+      matchedAdded.add(match.addedIdx);
+    }
+  }
+
+  // Build result: process in order of appearance
+  // First, interleave matched pairs in their original order
+  let ri = 0;
+  let ai = 0;
+
+  while (ri < removedBlock.length || ai < addedBlock.length) {
+    // Check if current removed line is matched
+    const removedMatch = finalMatches.find(m => m.removedIdx === ri);
+
+    if (ri < removedBlock.length && removedMatch) {
+      // This removed line is matched
+      const removed = removedBlock[ri];
+      const added = addedBlock[removedMatch.addedIdx];
+      const oldText = removed.oldText || '';
+      const newText = added.newText || '';
+
+      // Check if lines are actually identical (100% similarity)
+      if (oldText === newText) {
+        result.push({
+          lineNumber: 0, // Will be renumbered
+          oldLineNumber: removed.oldLineNumber,
+          newLineNumber: added.newLineNumber,
+          type: 'unchanged',
+          oldText,
+          newText
+        });
+      } else {
+        result.push({
+          lineNumber: 0, // Will be renumbered
+          oldLineNumber: removed.oldLineNumber,
+          newLineNumber: added.newLineNumber,
+          type: 'modified',
+          oldText,
+          newText,
+          segments: computeDiff(oldText, newText)
+        });
+      }
+
+      // Skip the matched added line when we encounter it
+      usedAdded.add(removedMatch.addedIdx);
+      ri++;
+    } else if (ri < removedBlock.length && !matchedRemoved.has(ri)) {
+      // Unmatched removed line
+      result.push(removedBlock[ri]);
+      ri++;
+    } else if (ri < removedBlock.length) {
+      // Matched but already processed
+      ri++;
+    } else if (ai < addedBlock.length && !usedAdded.has(ai)) {
+      // Unmatched added line
+      result.push(addedBlock[ai]);
+      ai++;
+    } else {
+      ai++;
+    }
+  }
+
+  return result;
 }
 
 interface HeadingInfo {

@@ -228,3 +228,36 @@ describe('edge cases', () => {
     expect(summary.unchanged).toBe(4);
   });
 });
+
+describe('restructured document handling', () => {
+  it('should match similar lines within removed/added blocks', () => {
+    const oldContent = readFixture('restructured-doc', 'old.md');
+    const newContent = readFixture('restructured-doc', 'new.md');
+
+    const result = computeLineDiff(oldContent, newContent);
+    const summary = summarizeDiff(result);
+
+    // Should find modified lines (not just removed+added)
+    expect(summary.modified).toBeGreaterThan(0);
+
+    // Total changes should be reasonable (not all lines as removed+added)
+    const totalChanges = summary.added + summary.removed + summary.modified;
+    expect(summary.modified).toBeGreaterThan(totalChanges * 0.2); // At least 20% modified
+  });
+
+  it('should match headings correctly across restructured content', () => {
+    const oldContent = readFixture('restructured-doc', 'old.md');
+    const newContent = readFixture('restructured-doc', 'new.md');
+
+    const result = computeLineDiff(oldContent, newContent);
+
+    // Find the "## Error Code Format" heading - should be matched (unchanged or modified)
+    const errorCodeFormatLine = result.find(l =>
+      (l.oldText?.includes('## Error Code Format') || l.newText?.includes('## Error Code Format'))
+    );
+
+    expect(errorCodeFormatLine).toBeDefined();
+    // Should be unchanged or modified, not just removed/added
+    expect(['unchanged', 'modified']).toContain(errorCodeFormatLine?.type);
+  });
+});
