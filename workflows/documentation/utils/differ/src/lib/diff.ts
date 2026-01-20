@@ -50,11 +50,22 @@ export function computeDiff(oldText: string, newText: string): DiffSegment[] {
 }
 
 /**
+ * Normalize line endings to LF for consistent diff comparison
+ */
+export function normalizeLineEndings(text: string): string {
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/**
  * Compute line-by-line diff with inline character changes
  */
 export function computeLineDiff(oldText: string, newText: string): LineDiff[] {
+  // Normalize line endings before comparison
+  const normalizedOld = normalizeLineEndings(oldText);
+  const normalizedNew = normalizeLineEndings(newText);
+
   // Use diff-match-patch line mode
-  const { chars1, chars2, lineArray } = dmp.diff_linesToChars_(oldText, newText);
+  const { chars1, chars2, lineArray } = dmp.diff_linesToChars_(normalizedOld, normalizedNew);
   const diffs = dmp.diff_main(chars1, chars2, false);
   dmp.diff_charsToLines_(diffs, lineArray);
   dmp.diff_cleanupSemantic(diffs);
@@ -177,12 +188,31 @@ function extractHeadings(lines: string[]): HeadingInfo[] {
 /**
  * Match headings between old and new documents
  * Returns pairs of matched heading indices
+ * Uses multiple strategies: exact match, similar text, and positional matching
  */
 function matchHeadings(oldHeadings: HeadingInfo[], newHeadings: HeadingInfo[]): Map<number, number> {
   const matches = new Map<number, number>();
   const usedNew = new Set<number>();
 
+  // First pass: exact text matches (same level and text)
   for (let oi = 0; oi < oldHeadings.length; oi++) {
+    const oldH = oldHeadings[oi];
+
+    for (let ni = 0; ni < newHeadings.length; ni++) {
+      if (usedNew.has(ni)) continue;
+      const newH = newHeadings[ni];
+
+      if (oldH.level === newH.level && oldH.text === newH.text) {
+        matches.set(oi, ni);
+        usedNew.add(ni);
+        break;
+      }
+    }
+  }
+
+  // Second pass: high similarity matches (>=60%)
+  for (let oi = 0; oi < oldHeadings.length; oi++) {
+    if (matches.has(oi)) continue;
     const oldH = oldHeadings[oi];
     let bestMatch = -1;
     let bestScore = 0;
@@ -194,9 +224,8 @@ function matchHeadings(oldHeadings: HeadingInfo[], newHeadings: HeadingInfo[]): 
       // Must be same level
       if (oldH.level !== newH.level) continue;
 
-      // Calculate similarity of heading text
       const similarity = calculateSimilarity(oldH.text, newH.text);
-      if (similarity > bestScore && similarity >= 50) {
+      if (similarity > bestScore && similarity >= 60) {
         bestScore = similarity;
         bestMatch = ni;
       }
@@ -205,6 +234,70 @@ function matchHeadings(oldHeadings: HeadingInfo[], newHeadings: HeadingInfo[]): 
     if (bestMatch >= 0) {
       matches.set(oi, bestMatch);
       usedNew.add(bestMatch);
+    }
+  }
+
+  // Third pass: lower threshold (>=30%) for remaining unmatched headings
+  // This helps when headings are translated or slightly modified
+  for (let oi = 0; oi < oldHeadings.length; oi++) {
+    if (matches.has(oi)) continue;
+    const oldH = oldHeadings[oi];
+    let bestMatch = -1;
+    let bestScore = 0;
+
+    for (let ni = 0; ni < newHeadings.length; ni++) {
+      if (usedNew.has(ni)) continue;
+      const newH = newHeadings[ni];
+
+      // Must be same level
+      if (oldH.level !== newH.level) continue;
+
+      const similarity = calculateSimilarity(oldH.text, newH.text);
+      if (similarity > bestScore && similarity >= 30) {
+        bestScore = similarity;
+        bestMatch = ni;
+      }
+    }
+
+    if (bestMatch >= 0) {
+      matches.set(oi, bestMatch);
+      usedNew.add(bestMatch);
+    }
+  }
+
+  // Fourth pass: positional matching for remaining same-level headings
+  // Match by relative position if there are unmatched headings at same level
+  const unmatchedOld = oldHeadings
+    .map((h, i) => ({ ...h, idx: i }))
+    .filter(h => !matches.has(h.idx));
+  const unmatchedNew = newHeadings
+    .map((h, i) => ({ ...h, idx: i }))
+    .filter(h => !usedNew.has(h.idx));
+
+  // Group by level
+  const oldByLevel = new Map<number, typeof unmatchedOld>();
+  const newByLevel = new Map<number, typeof unmatchedNew>();
+
+  for (const h of unmatchedOld) {
+    const list = oldByLevel.get(h.level) || [];
+    list.push(h);
+    oldByLevel.set(h.level, list);
+  }
+
+  for (const h of unmatchedNew) {
+    const list = newByLevel.get(h.level) || [];
+    list.push(h);
+    newByLevel.set(h.level, list);
+  }
+
+  // Match by position within same level
+  for (const [level, oldList] of oldByLevel) {
+    const newList = newByLevel.get(level) || [];
+    const count = Math.min(oldList.length, newList.length);
+
+    for (let i = 0; i < count; i++) {
+      matches.set(oldList[i].idx, newList[i].idx);
+      usedNew.add(newList[i].idx);
     }
   }
 
@@ -477,7 +570,10 @@ function escapeHtml(text: string): string {
  * Calculate similarity percentage between two texts
  */
 export function calculateSimilarity(oldText: string, newText: string): number {
-  const diffs = dmp.diff_main(oldText, newText);
+  // Normalize line endings for consistent comparison
+  const normalizedOld = normalizeLineEndings(oldText);
+  const normalizedNew = normalizeLineEndings(newText);
+  const diffs = dmp.diff_main(normalizedOld, normalizedNew);
   const levenshtein = dmp.diff_levenshtein(diffs);
   const maxLength = Math.max(oldText.length, newText.length);
 

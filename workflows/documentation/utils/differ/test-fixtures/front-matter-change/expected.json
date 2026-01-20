@@ -1,0 +1,5 @@
+{
+  "description": "Front-matter changes should be detected, body unchanged",
+  "frontMatterChanged": true,
+  "bodyUnchanged": true
+}

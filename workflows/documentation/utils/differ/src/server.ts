@@ -11,7 +11,7 @@ import * as fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 
 import { initGit, getCurrentVersion, getPreviousVersion, saveAndStage } from './lib/git.js';
-import { computeLineDiff, calculateSimilarity, createAlignedLines, AlignedLine } from './lib/diff.js';
+import { computeLineDiff, calculateSimilarity, createSimpleAlignedLines, AlignedLine } from './lib/diff.js';
 import { parseMarkdownSections, renderMarkdown, alignSections } from './lib/markdown.js';
 import {
   ReviewSession,
@@ -47,6 +47,10 @@ interface ReviewState {
   resolve: (result: ReviewResult) => void;
   reject: (error: Error) => void;
 }
+
+// Build info for debugging
+const BUILD_VERSION = '0.1.0';
+const BUILD_TIMESTAMP = new Date().toISOString();
 
 let currentReview: ReviewState | null = null;
 let wsClients: Set<WebSocket> = new Set();
@@ -191,7 +195,7 @@ export async function startReviewServer(
       const oldParsed = parseMarkdownSections(oldContent);
       const newParsed = parseMarkdownSections(newContent);
 
-      const alignedLines = createAlignedLines(oldParsed.body, newParsed.body);
+      const alignedLines = createSimpleAlignedLines(oldParsed.body, newParsed.body);
       const similarity = calculateSimilarity(oldParsed.body, newParsed.body);
 
       res.json({ alignedLines, similarity });
@@ -220,7 +224,8 @@ export async function startReviewServer(
   return new Promise((resolve, reject) => {
     initializeReview(request, resolve, reject).then(() => {
       server.listen(port, () => {
-        console.log(`Review server running at http://localhost:${port}`);
+        console.log(`Doc Review web server v${BUILD_VERSION} started at ${BUILD_TIMESTAMP}`);
+        console.log(`Review UI available at http://localhost:${port}`);
       });
 
       // Handle server shutdown
@@ -307,7 +312,7 @@ async function buildReviewState(review: ReviewState) {
     : [];
 
   const nbAlignedLines = nbPrevSections
-    ? createAlignedLines(nbPrevSections.body, nbSections.body)
+    ? createSimpleAlignedLines(nbPrevSections.body, nbSections.body)
     : null;
 
   const enDiff = enPrevSections && enSections
@@ -315,7 +320,7 @@ async function buildReviewState(review: ReviewState) {
     : [];
 
   const enAlignedLines = enPrevSections && enSections
-    ? createAlignedLines(enPrevSections.body, enSections.body)
+    ? createSimpleAlignedLines(enPrevSections.body, enSections.body)
     : null;
 
   const alignedSections = enSections

@@ -51,7 +51,7 @@ export async function getCurrentVersion(filePath: string): Promise<string> {
 export async function getPreviousVersion(
   gitModule: GitModule,
   filePath: string,
-  commitRef: string = 'HEAD~1'
+  commitRef: string = 'HEAD'
 ): Promise<FileVersion | null> {
   const { git, repoRoot } = gitModule;
   const absolutePath = path.resolve(filePath);

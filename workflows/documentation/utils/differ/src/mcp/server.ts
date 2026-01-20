@@ -333,11 +333,16 @@ ${session.enFilePath ? `- English: ${session.enFilePath}` : ''}`
   }
 }
 
+// Build info for debugging
+const BUILD_VERSION = '0.1.0';
+const BUILD_TIMESTAMP = new Date().toISOString();
+
 // Start server
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Doc Review MCP server running on stdio');
+  console.error(`Doc Review MCP server v${BUILD_VERSION} started at ${BUILD_TIMESTAMP}`);
+  console.error('Diff normalization: CRLF/LF handling enabled');
 }
 
 main().catch(console.error);

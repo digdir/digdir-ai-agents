@@ -8,12 +8,14 @@
     "doc-review-mcp": "dist/mcp/server.js"
   },
   "scripts": {
+    "prebuild": "node -e \"const fs = require('fs'); if(fs.existsSync('dist')) fs.rmSync('dist', {recursive: true})\"",
     "build": "tsc && npm run copy-web",
     "copy-web": "node -e \"require('fs').cpSync('src/web', 'dist/web', {recursive: true})\"",
     "dev": "tsc --watch",
     "start:mcp": "node dist/mcp/server.js",
     "start:web": "node dist/server.js",
-    "test": "node --test dist/**/*.test.js"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
@@ -30,7 +32,8 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
     "@types/ws": "^8.5.13",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   },
   "engines": {
     "node": ">=20.0.0"

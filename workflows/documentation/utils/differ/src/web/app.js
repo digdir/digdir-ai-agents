@@ -142,22 +142,35 @@ function setupScrollSync() {
     elements.colOldEn
   ];
 
+  let isScrolling = false;
+
   // Sync all columns together
   allColumns.forEach(sourceCol => {
     const sourceContent = sourceCol?.querySelector('.column-content');
     if (!sourceContent) return;
 
     sourceContent.addEventListener('scroll', () => {
-      const scrollRatio = sourceContent.scrollTop /
-        Math.max(1, sourceContent.scrollHeight - sourceContent.clientHeight);
+      // Prevent feedback loop
+      if (isScrolling) return;
+      isScrolling = true;
+
+      const maxScroll = sourceContent.scrollHeight - sourceContent.clientHeight;
+      const scrollRatio = maxScroll > 0 ? sourceContent.scrollTop / maxScroll : 0;
 
       allColumns.forEach(targetCol => {
         if (targetCol === sourceCol) return;
         const targetContent = targetCol?.querySelector('.column-content');
         if (!targetContent) return;
 
-        targetContent.scrollTop = scrollRatio *
-          (targetContent.scrollHeight - targetContent.clientHeight);
+        const targetMaxScroll = targetContent.scrollHeight - targetContent.clientHeight;
+        if (targetMaxScroll > 0) {
+          targetContent.scrollTop = scrollRatio * targetMaxScroll;
+        }
+      });
+
+      // Reset flag after a short delay to allow the scroll to complete
+      requestAnimationFrame(() => {
+        isScrolling = false;
       });
     });
   });
