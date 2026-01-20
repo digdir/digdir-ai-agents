@@ -9,8 +9,8 @@ import urllib.error
 from pathlib import Path
 
 # Standardverdier
-DEFAULT_API_URL = "http://localhosr:1234/v1/chat/completions"
-DEFAULT_MODEL = "borealis-4b-instruct-preview-gguf:BF16"
+DEFAULT_API_URL = "http://localhost:1234/v1/chat/completions"
+DEFAULT_MODEL = "borealis-4b-instruct-preview"
 
 
 def load_env_file() -> dict[str, str]:
