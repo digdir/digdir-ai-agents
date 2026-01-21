@@ -35,6 +35,7 @@ Denne skillen:
 - `language-editor-en` - Språkvask og forbedring av engelsk tekst
 
 ### Skills (via /skill-navn)
+- `/doc-improve` - Forbedre eksisterende dokumentasjon basert på en URL
 - `/doc-workflow` - Start dokumentasjonsarbeidsflyt for en issue
 - `/refine-language` - AI-assistert språkforbedring med Borealis
 
