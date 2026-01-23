@@ -52,6 +52,68 @@ The user needs substantial user-facing documentation, which is exactly what the 
 - Use consistent terminology throughout the document
 - Include relevant links to related documentation or resources
 
+## Complete Documentation Workflow with MCP Tools
+
+Follow this workflow for all documentation tasks. The workflow has **two human checkpoints** to ensure quality before investing time in translation.
+
+### Phase 1: Write Norwegian Version First
+1. Create the Norwegian documentation (`_index.nb.md`)
+2. Follow Diátaxis structure and plain language principles
+
+### Phase 2: Norwegian Language Improvement with Borealis
+Use the **refine-language** skill for AI-assisted language review with the Norwegian language model Borealis:
+
+```bash
+python .claude/skills/refine-language/scripts/borealis.py "<Norwegian text to improve>"
+```
+
+Critically evaluate suggestions and implement improvements.
+
+### Phase 3: Checkpoint 1 - Norwegian Approval
+**Before translation**, submit the Norwegian version for human review:
+
+```
+mcp__doc-review__review_documentation with:
+- nb_file: path to Norwegian file
+```
+
+The reviewer can:
+- View diff-highlighted changes
+- Edit content directly
+- Add comments for revision
+- Approve or reject with feedback
+
+**Iterate until approved.** This ensures translation starts from a quality-assured source.
+
+### Phase 4: Translate to English
+Only after Norwegian approval:
+1. Create the English version (`_index.en.md`)
+2. Follow TERMINOLOGY.md for approved translations
+3. Use British English conventions
+
+### Phase 5: Checkpoint 2 - Final Approval
+Submit both versions for comparative human review:
+
+```
+mcp__doc-review__review_documentation with:
+- nb_file: path to Norwegian file
+- en_file: path to English file
+```
+
+The reviewer can:
+- Compare Norwegian and English side-by-side
+- Verify translation accuracy and consistency
+- Edit content directly in either language
+- Add comments for revision
+- Approve or reject with feedback
+
+### Phase 6: Iteration
+If rejected at any checkpoint:
+1. Read feedback with `mcp__doc-review__get_review_feedback`
+2. Address all comments and requested changes
+3. Re-submit for review
+4. Repeat until approved
+
 ## Before Starting Any Documentation Task
 
 Ask clarifying questions about:

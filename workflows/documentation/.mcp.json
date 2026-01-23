@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "doc-review": {
+      "command": "node",
+      "args": [
+        "utils/differ/dist/mcp/server.js"
+      ]
+    }
+  }
+}
