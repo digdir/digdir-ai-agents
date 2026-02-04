@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "diff-match-patch": "^1.0.5",
     "express": "^4.21.0",
     "marked": "^15.0.0",
