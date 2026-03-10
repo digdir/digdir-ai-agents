@@ -24,7 +24,7 @@
     "express": "^4.21.0",
     "marked": "^15.0.0",
     "open": "^10.1.0",
-    "simple-git": "^3.27.0",
+    "simple-git": "^3.32.3",
     "ws": "^8.18.0"
   },
   "devDependencies": {
