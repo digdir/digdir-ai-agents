@@ -1,0 +1,76 @@
+import { loadConfig } from "./config.ts";
+import { createLogger } from "./logger.ts";
+import { GithubPoller } from "./github/poller.ts";
+import { SlackConnector } from "./slack/connector.ts";
+import { AgentQueue } from "./agent/queue.ts";
+import type { ResultPosters } from "./agent/types.ts";
+
+const log = createLogger("main");
+
+async function main(): Promise<void> {
+  const config = loadConfig();
+
+  if (!config.github.enabled && !config.slack.enabled) {
+    log.warn("Neither GITHUB_ENABLED nor SLACK_ENABLED is true — nothing to do. Exiting.");
+    return;
+  }
+
+  const abort = new AbortController();
+  const queue = config.agentQueue.enabled ? new AgentQueue(config.agentQueue) : null;
+  if (queue) await queue.init();
+
+  // When we both enqueue and post answers back, connectors use a transient
+  // "working" reaction that the result watcher clears once the answer arrives.
+  const awaitReply = config.agentQueue.enabled && config.agentQueue.postResults;
+
+  const github = config.github.enabled ? new GithubPoller(config.github, queue, awaitReply) : null;
+  const slack = config.slack.enabled ? new SlackConnector(config.slack, queue, awaitReply) : null;
+
+  const shutdown = (signal: string) => {
+    log.info(`Received ${signal}, shutting down…`);
+    abort.abort();
+    github?.stop();
+    slack?.stop().catch((err) => log.error("Error during Slack shutdown.", err));
+    // Give in-flight work a brief moment, then force-exit.
+    setTimeout(() => process.exit(0), 1000).unref();
+  };
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+  // Start connectors concurrently. A failure in one must not stop the other.
+  const tasks: Promise<void>[] = [];
+  if (github) {
+    tasks.push(
+      github.start(abort.signal).catch((err) => {
+        log.error("GitHub connector stopped with an error.", err);
+      }),
+    );
+  }
+  if (slack) {
+    tasks.push(
+      slack.start().catch((err) => {
+        log.error("Slack connector failed to start.", err);
+      }),
+    );
+  }
+
+  // Poll dd-agent's results and post answers back to their origin.
+  if (queue && config.agentQueue.postResults) {
+    const posters: ResultPosters = {};
+    if (slack) posters.slack = (reply, delivery) => slack.deliver(reply, delivery);
+    if (github) posters.github = (reply, delivery) => github.deliver(reply, delivery);
+    tasks.push(
+      queue.startResultWatcher(posters, abort.signal).catch((err) => {
+        log.error("Result watcher stopped with an error.", err);
+      }),
+    );
+  }
+
+  log.info("agent-bot started.");
+  await Promise.all(tasks);
+}
+
+main().catch((err) => {
+  log.error("Fatal error during startup.", err);
+  process.exit(1);
+});
