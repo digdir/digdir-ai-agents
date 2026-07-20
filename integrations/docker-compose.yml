@@ -1,0 +1,24 @@
+services:
+  integrations:
+    build: .
+    image: digdir/integrations:latest
+    env_file: .env
+    environment:
+      # Overstyrer .env, som er skrevet for kjøring på hosten: inne i
+      # containeren ligger køen alltid på /triggers og state på /state.
+      AGENT_TRIGGERS_DIR: /triggers
+      AGENT_STATE_DIR: /state
+    volumes:
+      # Delt kø med proxy-agent: samme host-katalog som proxy-agent mounter
+      # som /triggers i sin container.
+      - ../agents/proxy-agent/triggers:/triggers
+      # Egen state (pending replies + results-offset) overlever restart
+      - integrations-state:/state
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  integrations-state:

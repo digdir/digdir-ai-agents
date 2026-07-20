@@ -32,20 +32,24 @@ agentens `triggers/`-katalog**. Formatet er beskrevet i
 
 ## Kom i gang
 
-```powershell
-# 1. Agenten (Docker)
-cd agents/proxy-agent
-Copy-Item .env.example .env      # fyll inn LLM-endepunkt/nøkkel
-docker compose build
-docker compose up -d
+Hele pipelinen kjører i Docker via compose-fila på rotnivå (krever Docker
+Compose v2.20+):
 
-# 2. Integrations (Node >= 23)
-cd ../../integrations
-npm install
-Copy-Item .env.example .env      # fyll inn Slack-/GitHub-tokens
-# sett AGENT_QUEUE_ENABLED=true for å koble integrations til agenten
-npm start
+```powershell
+# 1. Konfig per komponent
+Copy-Item integrations\.env.example integrations\.env              # Slack-/GitHub-tokens
+Copy-Item agents\proxy-agent\.env.example agents\proxy-agent\.env  # LLM-endepunkt/nøkkel
+# sett AGENT_QUEUE_ENABLED=true i integrations\.env for å koble dem sammen
+
+# 2. Dra opp alt
+docker compose up -d --build
+docker compose logs -f
 ```
+
+Rot-compose-fila bare inkluderer komponentenes egne compose-filer, så hver
+komponent kan fortsatt dras opp alene med `docker compose up` i sin katalog.
+Integrations kan også kjøres rett på hosten under utvikling (Node >= 23:
+`cd integrations && npm install && npm start`).
 
 ## Legge til en ny agent
 

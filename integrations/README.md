@@ -116,6 +116,20 @@ npm run typecheck    # tsc --noEmit
 
 Set `LOG_LEVEL=debug` for verbose output. Stop with Ctrl-C (graceful shutdown).
 
+### Run in Docker
+
+```bash
+docker compose up -d --build   # from this directory
+docker compose logs -f
+```
+
+The container reads credentials from the same `.env` file, but compose
+overrides `AGENT_TRIGGERS_DIR`/`AGENT_STATE_DIR` with container paths: the
+queue is a bind mount of `../agents/proxy-agent/triggers` (shared with the
+proxy-agent container) and state lives in a named volume. To run the whole
+pipeline (this app + agents) in one go, use the compose file at the repo root
+instead.
+
 Each connector is independent: enable one or both via `GITHUB_ENABLED` /
 `SLACK_ENABLED`. A failure in one connector is logged and does not stop the other.
 
