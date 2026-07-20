@@ -35,6 +35,15 @@ if [[ -n "$PI_MODEL" ]]; then
   pi_args+=(--model "$PI_MODEL")
 fi
 
+# Skills bakt inn i imaget (se Dockerfile). Lastes eksplisitt med --skill
+# siden ~/.pi ligger på et volum som ville skygget image-innhold.
+SKILLS_DIR="${SKILLS_DIR:-/opt/pi-skills}"
+if [[ -d "$SKILLS_DIR" ]]; then
+  for skill_dir in "$SKILLS_DIR"/*/; do
+    [[ -f "$skill_dir/SKILL.md" ]] && pi_args+=(--skill "${skill_dir%/}")
+  done
+fi
+
 log() {
   printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
