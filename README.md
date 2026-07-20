@@ -39,7 +39,6 @@ Compose v2.20+):
 # 1. Konfig per komponent
 Copy-Item integrations\.env.example integrations\.env              # Slack-/GitHub-tokens
 Copy-Item agents\proxy-agent\.env.example agents\proxy-agent\.env  # LLM-endepunkt/nøkkel
-# sett AGENT_QUEUE_ENABLED=true i integrations\.env for å koble dem sammen
 
 # 2. Dra opp alt
 docker compose up -d --build

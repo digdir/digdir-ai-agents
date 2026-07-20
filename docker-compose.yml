@@ -3,7 +3,6 @@
 # Forutsetninger:
 #   Copy-Item integrations\.env.example integrations\.env          # Slack-/GitHub-tokens
 #   Copy-Item agents\proxy-agent\.env.example agents\proxy-agent\.env  # LLM-endepunkt
-#   (husk AGENT_QUEUE_ENABLED=true i integrations\.env)
 #
 #   docker compose up -d --build
 #
