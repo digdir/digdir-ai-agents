@@ -1,4 +1,4 @@
-# dd-agent — Pi-agent isolert i Docker
+# proxy-agent — Pi-agent isolert i Docker
 
 Kjører [Pi](https://pi.dev/) (`@earendil-works/pi-coding-agent`) i en isolert Docker-container,
 med en livssyklus som trigges av eksterne events (f.eks. Slack eller GitHub) — **uten** at
@@ -94,7 +94,7 @@ For hvert event blir agenten bedt om å klassifisere henvendelsen som én av:
 Agenten avslutter outputen med en linje `===AGENT-RESULT===` etterfulgt av et
 JSON-objekt `{"intent":"…","reply":"…"}`. Entrypointet trekker dette ut og
 legger `intent` og `reply` på resultatlinja (en ren tekst atskilt fra rå-loggen).
-Klarer ikke agenten å produsere blokken, utelates feltene – mottakeren (agent-bot)
+Klarer ikke agenten å produsere blokken, utelates feltene – mottakeren (integrations)
 faller da tilbake til å poste hele loggen.
 
 Mottakeren bruker `intent` til å avgjøre responsen: `action`/`feedback` postes

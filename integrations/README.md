@@ -1,4 +1,4 @@
-# agent-bot
+# integrations
 
 A small local bot that listens for GitHub and Slack events and reacts to them.
 This first iteration uses a **pull / websocket** pattern only — it never exposes
@@ -23,10 +23,10 @@ an inbound webhook endpoint, so it can run entirely from your laptop.
   the agent, which interprets what the reaction means (e.g. a 👍 as positive
   feedback). The bot ignores its own reactions to avoid loops.
 
-**Agent queue bridge** (optional — connects to the `dd-agent` LLM worker):
+**Agent queue bridge** (optional — connects to the `proxy-agent` LLM worker):
 - When enabled, each event the bot reacts to is also handed off to
-  [`dd-agent`](../agents/dd-agent) by appending one JSON line to its
-  `triggers/inbox.jsonl`. `dd-agent` runs the LLM agent in an isolated Docker
+  [`proxy-agent`](../agents/proxy-agent) by appending one JSON line to its
+  `triggers/inbox.jsonl`. `proxy-agent` runs the LLM agent in an isolated Docker
   container and writes its answer to `triggers/results.jsonl` + `logs/<id>.log`.
 - The bot polls `results.jsonl` and delivers each answer back where it came
   from, based on how the agent **classified** the input (`intent`):
@@ -34,13 +34,13 @@ an inbound webhook endpoint, so it can run entirely from your laptop.
     reply** in Slack / an **issue/PR comment** on GitHub.
   - **`ack`** (a pure "noted"/thanks) → post nothing, just add an
     acknowledgement reaction (Slack ✅ `white_check_mark`, GitHub 👍 `+1`).
-  - Results without an `intent` (older dd-agent) fall back to posting the log.
+  - Results without an `intent` (older proxy-agent) fall back to posting the log.
 - While the agent works, the bot shows a **"working" reaction** (Slack
   🤔 `thinking_face`, GitHub 👀 `eyes`) on the triggering message and **removes
   it once the result is delivered**. (When the bridge is off, it instead leaves
   a persistent acknowledgement reaction — 🤷 / 🚀.)
 
-The bot and dd-agent agree on a small **result contract** in `results.jsonl`
+The bot and proxy-agent agree on a small **result contract** in `results.jsonl`
 (all classification fields optional, so it stays backward compatible):
 
 ```jsonc
@@ -50,10 +50,10 @@ The bot and dd-agent agree on a small **result contract** in `results.jsonl`
   "log": "logs/<id>.log", … }
 ```
 
-This is the "receiver" role described in dd-agent's own README: agent-bot is
-the only side that holds Slack/GitHub tokens; dd-agent only ever touches the
+This is the "receiver" role described in proxy-agent's own README: integrations is
+the only side that holds Slack/GitHub tokens; proxy-agent only ever touches the
 shared `triggers/` files. Enable it with `AGENT_QUEUE_ENABLED=true` and point
-`AGENT_TRIGGERS_DIR` at dd-agent's `triggers/` directory (both apps run on the
+`AGENT_TRIGGERS_DIR` at proxy-agent's `triggers/` directory (both apps run on the
 same machine).
 
 ## Requirements

@@ -1,7 +1,7 @@
 services:
   pi-agent:
     build: ./docker
-    image: dd-agent/pi:latest
+    image: proxy-agent/pi:latest
     env_file: .env
     environment:
       POLL_INTERVAL: ${POLL_INTERVAL:-5}

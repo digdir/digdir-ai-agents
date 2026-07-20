@@ -1,12 +1,12 @@
 /**
- * Shared types for the handoff to the dd-agent queue. agent-bot is the
- * "receiver" that dd-agent's README describes: it translates Slack/GitHub
- * events into one JSON line in `triggers/inbox.jsonl`, and posts dd-agent's
+ * Shared types for the handoff to the proxy-agent queue. integrations is the
+ * "receiver" that proxy-agent's README describes: it translates Slack/GitHub
+ * events into one JSON line in `triggers/inbox.jsonl`, and posts proxy-agent's
  * results (`triggers/results.jsonl` + `triggers/logs/<id>.log`) back to the
  * originating thread/issue.
  */
 
-/** One line appended to `triggers/inbox.jsonl`. Matches dd-agent's event format. */
+/** One line appended to `triggers/inbox.jsonl`. Matches proxy-agent's event format. */
 export interface QueueEvent {
   id: string;
   source: "slack" | "github";
@@ -42,7 +42,7 @@ export type ReplyContext =
     };
 
 /**
- * One line read from `triggers/results.jsonl`, written by dd-agent. `intent`
+ * One line read from `triggers/results.jsonl`, written by proxy-agent. `intent`
  * and `reply` are produced by the agent's classification step; older results
  * without them fall back to posting the raw log.
  */

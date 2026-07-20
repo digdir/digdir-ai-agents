@@ -31,11 +31,11 @@ export interface SlackConfig {
 
 export interface AgentQueueConfig {
   enabled: boolean;
-  /** dd-agent's shared `triggers/` directory. */
+  /** proxy-agent's shared `triggers/` directory. */
   triggersDir: string;
   inboxFile: string;
   resultsFile: string;
-  /** agent-bot's own state (pending replies + results offset). */
+  /** integrations's own state (pending replies + results offset). */
   stateDir: string;
   resultsPollIntervalSeconds: number;
   /** Whether to poll results and post answers back to Slack/GitHub. */
@@ -123,7 +123,7 @@ export function loadConfig(): Config {
     if (!dir) {
       throw new Error(
         "AGENT_QUEUE_ENABLED is true but AGENT_TRIGGERS_DIR is not set — point it " +
-          "at an agent's `triggers/` directory (e.g. ../agents/dd-agent/triggers).",
+          "at an agent's `triggers/` directory (e.g. ../agents/proxy-agent/triggers).",
       );
     }
     agentQueue.triggersDir = path.resolve(dir);

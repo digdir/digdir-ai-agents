@@ -54,7 +54,7 @@ async function main(): Promise<void> {
     );
   }
 
-  // Poll dd-agent's results and post answers back to their origin.
+  // Poll proxy-agent's results and post answers back to their origin.
   if (queue && config.agentQueue.postResults) {
     const posters: ResultPosters = {};
     if (slack) posters.slack = (reply, delivery) => slack.deliver(reply, delivery);
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
     );
   }
 
-  log.info("agent-bot started.");
+  log.info("integrations started.");
   await Promise.all(tasks);
 }
 

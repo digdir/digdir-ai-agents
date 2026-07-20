@@ -46,7 +46,7 @@ export class GithubClient {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "agent-bot",
+      "User-Agent": "integrations",
       ...extra,
     };
   }
@@ -226,7 +226,7 @@ export function issueNumberFrom(subjectUrl: string | null): number | null {
 /**
  * A stable, filename-safe id for a notification event. Prefers the triggering
  * comment id (so each new comment is its own event); falls back to the thread's
- * last-updated timestamp. dd-agent uses this as the log filename and dedupe key.
+ * last-updated timestamp. proxy-agent uses this as the log filename and dedupe key.
  */
 export function eventIdFor(notification: GithubNotification): string {
   const { full_name } = notification.repository;

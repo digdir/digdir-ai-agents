@@ -7,7 +7,7 @@ import type { Delivery, QueueEvent, ReplyContext, ResultLine, ResultPosters } fr
 const log = createLogger("queue");
 
 /**
- * Bridges agent-bot to dd-agent over the shared `triggers/` directory:
+ * Bridges integrations to proxy-agent over the shared `triggers/` directory:
  *   - {@link submit} appends an event to `inbox.jsonl` and remembers where its
  *     eventual result should be posted (the pending map, persisted to disk so
  *     it survives restarts between submit and result).
@@ -49,7 +49,7 @@ export class AgentQueue {
   /**
    * Appends an event to the inbox and records where its result should go.
    * The append is a single write, so with a single writer (this process) it is
-   * effectively atomic; dd-agent only ever reads the file.
+   * effectively atomic; proxy-agent only ever reads the file.
    */
   async submit(event: QueueEvent, reply: ReplyContext): Promise<void> {
     await fs.appendFile(this.config.inboxFile, JSON.stringify(event) + "\n", "utf8");
