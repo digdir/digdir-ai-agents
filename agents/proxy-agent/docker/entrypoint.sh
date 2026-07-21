@@ -100,7 +100,30 @@ log() {
 # Marker the agent must print before its machine-readable result block.
 RESULT_MARKER="===AGENT-RESULT==="
 
+# Delegering: DELEGATE_AGENTS="navn:beskrivelse;navn2:beskrivelse" gjør
+# "delegate" tilgjengelig som intent — broen (integrations) ruter da oppgaven
+# videre til målagentens innboks. Tomt = ingen delegering.
+DELEGATE_AGENTS="${DELEGATE_AGENTS:-}"
+
+delegate_targets() {
+  local entry name desc
+  local IFS=';'
+  for entry in $DELEGATE_AGENTS; do
+    name="${entry%%:*}"
+    desc="${entry#*:}"
+    [[ -n "$name" ]] || continue
+    [[ "$desc" != "$entry" ]] || desc="(ingen beskrivelse)"
+    printf '     * "%s": %s\n' "$name" "$desc"
+  done
+}
+
 classification_block() {
+  local delegate_line="" delegate_doc="" intents='action|feedback|ack'
+  if [[ -n "$DELEGATE_AGENTS" ]]; then
+    intents='action|feedback|ack|delegate'
+    delegate_line=$(printf '   - "delegate": oppgaven bør utføres av en annen agent. Tilgjengelige agenter:\n%s' "$(delegate_targets)")
+    delegate_doc=$'\nVed "delegate" legger du i tillegg feltet "delegate" i JSON-objektet:\n{"intent":"delegate","reply":"<kort: hva du delegerer og hvorfor>","delegate":{"agent":"<agentnavn>","prompt":"<komplett, selvstendig oppgavebeskrivelse til målagenten>","payload":{}}}\nSkriv "prompt" så målagenten kan løse oppgaven uten annen kontekst. Ikke utfør oppgaven selv.'
+  fi
   cat <<EOF
 ---
 Du er en agent som mottar henvendelser fra Slack/GitHub via en bro. Gjør to ting:
@@ -109,13 +132,15 @@ Du er en agent som mottar henvendelser fra Slack/GitHub via en bro. Gjør to tin
    - "action": brukeren ber om at noe konkret skal gjøres (en oppgave/jobb). Utfør oppgaven. Arbeidskatalogen er /workspace.
    - "feedback": brukeren gir en tilbakemelding/korrigering som bør noteres, men som ikke er en ny konkret oppgave.
    - "ack": en ren kvittering/bekreftelse (f.eks. "ok", "takk", et tommel-opp) som ikke krever handling.
+${delegate_line}
 
 2) Formuler et kort, vennlig svar på norsk til brukeren ("reply"). For "ack" kan "reply" være tom.
 
 HELT TIL SLUTT skriver du en linje med KUN teksten:
 $RESULT_MARKER
 og deretter ett JSON-objekt (kan gå over flere linjer):
-{"intent":"action|feedback|ack","reply":"<svaret ditt på norsk>"}
+{"intent":"$intents","reply":"<svaret ditt på norsk>"}
+${delegate_doc}
 EOF
 }
 
@@ -199,14 +224,16 @@ process_event() {
 
   finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-  # Pull the agent's classification (intent + reply) out of the log, if present.
-  local result_json intent reply
+  # Pull the agent's classification (intent + reply + evt. delegate) out of
+  # the log, if present.
+  local result_json intent reply delegate
   result_json=$(extract_result_json "$log_file")
   if [[ -n "$result_json" ]]; then
     intent=$(jq -r '.intent // empty' <<<"$result_json")
     reply=$(jq -r '.reply // empty' <<<"$result_json")
+    delegate=$(jq -c '.delegate // empty' <<<"$result_json")
   else
-    intent=""; reply=""
+    intent=""; reply=""; delegate=""
   fi
 
   jq -cn \
@@ -216,11 +243,13 @@ process_event() {
     --arg log "logs/$id.log" \
     --arg intent "$intent" \
     --arg reply "$reply" \
+    --arg delegate "$delegate" \
     --arg started_at "$started" \
     --arg finished_at "$finished" \
     '{id: $id, status: $status, exit_code: $exit_code, log: $log, started_at: $started_at, finished_at: $finished_at}
        + (if $intent != "" then {intent: $intent} else {} end)
-       + (if $reply  != "" then {reply:  $reply}  else {} end)' \
+       + (if $reply  != "" then {reply:  $reply}  else {} end)
+       + (if $delegate != "" then {delegate: ($delegate | fromjson)} else {} end)' \
     >>"$RESULT_FILE"
   log "Event $id ferdig (exit $exit_code, intent=${intent:-?}, logg: $log_file)"
 }

@@ -8,10 +8,15 @@ services:
       # containeren ligger køen alltid på /triggers og state på /state.
       AGENT_TRIGGERS_DIR: /triggers
       AGENT_STATE_DIR: /state
+      # Delegeringsruter (AGENT_ROUTES i .env) slås opp som /agents/<navn>/triggers.
+      AGENT_AGENTS_DIR: /agents
     volumes:
       # Delt kø med proxy-agent: samme host-katalog som proxy-agent mounter
       # som /triggers i sin container.
       - ../agents/proxy-agent/triggers:/triggers
+      # Agentkatalogen, for delegering til andre agenters innbokser.
+      # integrations er naven i pipelinen og har allerede alle tokens.
+      - ../agents:/agents
       # Egen state (pending replies + results-offset) overlever restart
       - integrations-state:/state
     restart: unless-stopped

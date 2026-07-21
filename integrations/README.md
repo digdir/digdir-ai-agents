@@ -56,6 +56,32 @@ shared `triggers/` files. Enable it with `AGENT_QUEUE_ENABLED=true` and point
 `AGENT_TRIGGERS_DIR` at proxy-agent's `triggers/` directory (both apps run on the
 same machine).
 
+**Delegation between agents** (optional — `AGENT_ROUTES`):
+- An agent can hand a task off to another agent by answering with
+  `intent: "delegate"` and a `delegate` object in its result line:
+
+  ```jsonc
+  { "id": "…", "status": "ok", "intent": "delegate",
+    "reply": "short interim notice posted to the origin",
+    "delegate": { "agent": "local-cc-coding-agent",
+                  "prompt": "complete, self-contained task description",
+                  "payload": { "issue": "https://github.com/…" } } }
+  ```
+
+- integrations (the hub — agents never write to each other's directories)
+  appends the task as a new event in the target agent's `inbox.jsonl`
+  (`source: "agent"`, `type: "delegation"`, with `payload.origin` linking back
+  to the delegating agent and event), and watches **every** configured agent's
+  `results.jsonl`.
+- The pending reply is remapped, so the target agent's eventual answer is
+  posted back to the **original** Slack thread / GitHub issue. The origin gets
+  the interim `reply` right away and keeps its "working" reaction until the
+  final answer arrives.
+- Targets must be allowlisted in `AGENT_ROUTES` (comma-separated agent names,
+  resolved as `<AGENT_AGENTS_DIR>/<name>/triggers`). Unknown targets are
+  reported back to the origin instead of executed. `AGENT_MAX_DELEGATION_HOPS`
+  (default 2) caps chains so two agents cannot ping-pong a task forever.
+
 ## Requirements
 
 - **Node ≥ 23** (runs the TypeScript directly via type stripping — no build step),
