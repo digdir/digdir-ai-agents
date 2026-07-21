@@ -6,6 +6,13 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-21** — M3 i [plans/agent-delegering.md](plans/agent-delegering.md):
+  ny skill `solution-proposal` i proxy-agenten — henvendelser som krever
+  kodeendringer analyseres (read-only `/repos`), struktureres som
+  GitHub-issue (bakgrunn, foreslått løsning, steg, berørte filer,
+  akseptansekriterier) og delegeres til `local-cc-coding-agent` med
+  issue-URL i payload og selvstendig prompt.
+
 - **2026-07-21** — Delegering mellom agenter (M1+M2 i
   [plans/agent-delegering.md](plans/agent-delegering.md)): resultatlinjer med
   `intent: "delegate"` rutes av integrations til målagentens innboks

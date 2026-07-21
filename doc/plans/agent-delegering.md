@@ -77,7 +77,7 @@ resultatet er alltid en PR et menneske reviewer.
   alltid egen branch + PR, append resultatlinje + logg. Starter med
   `cd agents/local-cc-coding-agent && claude` — ingen wrapper nødvendig.
 
-### M3 — Løsningsforslag → delegering, ende til ende
+### M3 — Løsningsforslag → delegering, ende til ende ✅
 - Skill i proxy-agenten (`solution-proposal`) som strukturerer analysen som
   GitHub-issue (bakgrunn, foreslått løsning, steg, berørte filer,
   akseptansekriterier) og delegerer utførelsen med issue-URL i payload.
