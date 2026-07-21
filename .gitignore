@@ -5,6 +5,10 @@
 # Node
 node_modules/
 
+# Anker-foldere for innlinkede eksterne repoer (kunnskapsbase + koderepoer)
+workspaces_knowledge/
+workspaces_repos/
+
 # Runtime state
 .state/
 .state.json

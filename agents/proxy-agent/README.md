@@ -116,12 +116,41 @@ er et bevisst, snevert unntak fra prinsippet om at agenten ikke har tokens —
 tokenet gir ikke tilgang til kode, og skillen instruerer agenten om at
 kodearbeid hører til en annen agent i pipelinen.
 
+### knowledge-base
+
+Lar agenten konsultere sin egen kunnskapsbase: et privat, instans-spesifikt
+OKF-wiki-repo som entrypointet kloner/puller til `/knowledge` ved oppstart
+(anker-folder `workspaces_knowledge/` på monorepo-rot, så klonen overlever
+restarts). Konfigureres med `KB_REPO` + `KB_GH_TOKEN` i `.env` — tomt =
+inaktiv. Tokenet er en fine-grained PAT fra bot-kontoen med Contents
+Read/Write på **kun** kunnskapsrepoet, bevisst atskilt fra `GH_TOKEN`.
+Agenten både leser og **fanger læringer**: etter oppgaver med reell
+læringsverdi (eller når brukeren ber den huske noe) appender den én
+JSON-linje til `inbox/learnings.jsonl` i kunnskapsrepoet og committer/pusher
+selv (identitet: `KB_GIT_NAME`/`KB_GIT_EMAIL`, default `proxy-agent`).
+Innboksen er karantene — wiki-sidene endres kun av synteseprosessen
+(se [`doc/plans/kunnskap-og-laering.md`](../../doc/plans/kunnskap-og-laering.md)).
+Repo-spesifikke læringer meldes i tillegg som issue med label `learning`
+på repoet det gjelder.
+
+### knowledge-synthesis
+
+Integrerer læringskandidatene fra `inbox/learnings.jsonl` i selve wikien:
+riktig side i `domains/`/`repos/`/`process/` (oppdatert, ikke bare
+appendert), nye sider lenkes fra `index.md`, motsigelser flagges, `log.md`
+oppdateres, innboksen tømmes, og alt committes/pushes. I watch-modus kjøres
+syntesen **automatisk** når innboksen har kandidater og det er minst
+`SYNTHESIS_INTERVAL_HOURS` (default 24) siden sist — og den kan alltid
+trigges manuelt med et event à la «kjør kunnskapssyntese».
+
 ## Isolasjon
 
 - Agenten kjører som ikke-root (`node`-brukeren) i containeren
 - `cap_drop: ALL` og `no-new-privileges` i compose
-- Agenten ser bare `/workspace` (det den skal jobbe med) og `/triggers` (køen);
-  ingen Slack-/GitHub-tokens finnes i containeren — kun LLM-API-nøkkelen
+- Agenten ser bare `/workspace` (det den skal jobbe med), `/triggers` (køen)
+  og `/knowledge` (kunnskapsbasen — en klone den eier selv); ingen
+  Slack-/GitHub-tokens finnes i containeren — kun LLM-API-nøkkelen og de
+  snevre unntakene `GH_TOKEN`/`KB_GH_TOKEN` beskrevet over
 - Nettverk trengs kun for LLM-API-et; vil du stramme inn, legg på egress-filtrering
   (f.eks. eget Docker-nettverk med proxy som kun tillater `api.anthropic.com`)
 
@@ -159,5 +188,9 @@ for Slack-events.
 | `ANTHROPIC_API_KEY` | – | LLM-nøkkel (evt. `OPENAI_API_KEY`, `GEMINI_API_KEY`) |
 | `PI_MODEL` | Pi sin default | Modellvalg, sendes som `--model` |
 | `POLL_INTERVAL` | `5` | Sekunder mellom hver sjekk av køen |
+| `KB_REPO` | – | Kunnskapsrepo: full URL eller `owner/repo` (tomt = inaktiv) |
+| `KB_GH_TOKEN` | – | Fine-grained PAT med Contents R/W på kun kunnskapsrepoet |
+| `KB_GIT_NAME` / `KB_GIT_EMAIL` | `proxy-agent` / noreply | Git-identitet for agentens commits i kunnskapsrepoet |
+| `SYNTHESIS_INTERVAL_HOURS` | `24` | Timer mellom automatiske synteser (0 = aldri automatisk) |
 | `TRIGGER_FILE` | `/triggers/inbox.jsonl` | Kø-fila inne i containeren |
 | `RESULT_FILE` | `/triggers/results.jsonl` | Resultat-fila |

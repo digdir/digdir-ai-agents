@@ -35,6 +35,55 @@ if [[ -n "$PI_MODEL" ]]; then
   pi_args+=(--model "$PI_MODEL")
 fi
 
+# Kunnskapsbase (OKF-wiki): KB_REPO klones/pulles til KNOWLEDGE_DIR ved
+# oppstart. KB_REPO kan være full URL eller owner/repo (github.com antas).
+# Tokenet leses fra env av credential-helperen ved bruk — det lagres aldri
+# i .git/config. Tom KB_REPO/KB_GH_TOKEN = kunnskapsbasen er inaktiv.
+KB_REPO="${KB_REPO:-}"
+KB_GH_TOKEN="${KB_GH_TOKEN:-}"
+KNOWLEDGE_DIR="${KNOWLEDGE_DIR:-/knowledge}"
+KB_CRED_HELPER='!f() { echo username=x-access-token; echo "password=${KB_GH_TOKEN}"; }; f'
+
+sync_knowledge() {
+  [[ -n "$KB_REPO" && -n "$KB_GH_TOKEN" ]] || return 0
+  local url="$KB_REPO"
+  case "$url" in
+    http://*|https://*) url="${url%.git}.git" ;;
+    *) url="https://github.com/${KB_REPO}.git" ;;
+  esac
+  mkdir -p "$KNOWLEDGE_DIR"
+  # Bind-mount fra hosten kan ha en annen eier enn container-brukeren;
+  # uten safe.directory nekter git å røre repoet ("not in a git directory").
+  git config --global --add safe.directory "$KNOWLEDGE_DIR" 2>/dev/null || true
+  if [[ -d "$KNOWLEDGE_DIR/.git" ]]; then
+    git -C "$KNOWLEDGE_DIR" config credential.helper "$KB_CRED_HELPER" 2>/dev/null || true
+    if git -C "$KNOWLEDGE_DIR" pull --ff-only --quiet 2>/dev/null; then
+      log "Kunnskapsbase: $KNOWLEDGE_DIR oppdatert fra remote"
+    else
+      log "Kunnskapsbase: pull feilet – fortsetter med eksisterende innhold"
+    fi
+  elif [[ -z "$(ls -A "$KNOWLEDGE_DIR" 2>/dev/null)" ]]; then
+    if git clone --config credential.helper="$KB_CRED_HELPER" --quiet "$url" "$KNOWLEDGE_DIR" 2>/dev/null; then
+      log "Kunnskapsbase: klonet til $KNOWLEDGE_DIR"
+    else
+      log "Kunnskapsbase: klarte ikke klone KB_REPO – fortsetter uten"
+    fi
+  else
+    log "Kunnskapsbase: $KNOWLEDGE_DIR er ikke tom og ikke et git-repo – hopper over sync"
+  fi
+  # Klargjør for fangst av læringer (M3): agenten committer selv i
+  # /knowledge, så repoet trenger identitet — og evt. lokale commits som
+  # ikke kom av gårde ved forrige push-feil prøves på nytt her.
+  if [[ -d "$KNOWLEDGE_DIR/.git" ]]; then
+    git -C "$KNOWLEDGE_DIR" config user.name  "${KB_GIT_NAME:-proxy-agent}" 2>/dev/null || true
+    git -C "$KNOWLEDGE_DIR" config user.email "${KB_GIT_EMAIL:-proxy-agent@users.noreply.github.com}" 2>/dev/null || true
+    git -C "$KNOWLEDGE_DIR" config pull.rebase true 2>/dev/null || true
+    # Første push mot et nyopprettet (tomt) repo skal etablere upstream selv
+    git -C "$KNOWLEDGE_DIR" config push.autoSetupRemote true 2>/dev/null || true
+    git -C "$KNOWLEDGE_DIR" push --quiet 2>/dev/null || true
+  fi
+}
+
 # Skills bakt inn i imaget (se Dockerfile). Lastes eksplisitt med --skill
 # siden ~/.pi ligger på et volum som ville skygget image-innhold.
 SKILLS_DIR="${SKILLS_DIR:-/opt/pi-skills}"
@@ -70,13 +119,55 @@ og deretter ett JSON-objekt (kan gå over flere linjer):
 EOF
 }
 
+# Kunnskapssyntese (M4/M5): kjøres automatisk i watch-modus når innboksen
+# har kandidater og det er minst SYNTHESIS_INTERVAL_HOURS siden sist.
+# 0 = aldri automatisk (syntese kan alltid trigges manuelt via et event).
+SYNTHESIS_INTERVAL_HOURS="${SYNTHESIS_INTERVAL_HOURS:-24}"
+SYNTHESIS_STATE_FILE="${SYNTHESIS_STATE_FILE:-/triggers/.synthesis-last}"
+
+synthesis_due() {
+  [[ "$SYNTHESIS_INTERVAL_HOURS" =~ ^[0-9]+$ ]] || return 1
+  (( SYNTHESIS_INTERVAL_HOURS > 0 )) || return 1
+  [[ -f "$KNOWLEDGE_DIR/index.md" ]] || return 1
+  [[ -s "$KNOWLEDGE_DIR/inbox/learnings.jsonl" ]] || return 1
+  local last=0 now
+  if [[ -f "$SYNTHESIS_STATE_FILE" ]]; then
+    last=$(<"$SYNTHESIS_STATE_FILE")
+    [[ "$last" =~ ^[0-9]+$ ]] || last=0
+  fi
+  now=$(date +%s)
+  (( now - last >= SYNTHESIS_INTERVAL_HOURS * 3600 ))
+}
+
+run_synthesis() {
+  local ts log_file rc
+  ts=$(date -u +%Y%m%dT%H%M%SZ)
+  log_file="$LOG_DIR/synthesis-$ts.log"
+  # Stemples før kjøring, så en feilende syntese ikke spinner hvert poll
+  date +%s >"$SYNTHESIS_STATE_FILE"
+  log "Kunnskapssyntese: starter (logg: $log_file)"
+  set +e
+  pi "${pi_args[@]}" "Kjør kunnskapssyntese på kunnskapsbasen i $KNOWLEDGE_DIR: følg prosedyren i knowledge-synthesis-skillen trinn for trinn." >"$log_file" 2>&1
+  rc=$?
+  set -e
+  log "Kunnskapssyntese: ferdig (exit $rc)"
+}
+
+# Kort hint om kunnskapsbasen, kun når den faktisk er tilgjengelig.
+knowledge_block() {
+  [[ -f "$KNOWLEDGE_DIR/index.md" ]] || return 0
+  printf 'Kunnskapsbase: %s er en OKF-wiki med domenekunnskap og tidligere lærdommer. Les %s/index.md og følg lenkene derfra hvis oppgaven kan dra nytte av det.\n\n' "$KNOWLEDGE_DIR" "$KNOWLEDGE_DIR"
+}
+
 build_prompt() {
-  local event_json="$1" prompt
+  local event_json="$1" prompt kb
+  kb=$(knowledge_block)
+  [[ -z "$kb" ]] || kb="$kb"$'\n\n'
   prompt=$(jq -r '.prompt // empty' <<<"$event_json")
   if [[ -n "$prompt" ]]; then
-    printf '%s\n\nKontekst – komplett trigger-event (JSON):\n%s\n\n%s\n' "$prompt" "$event_json" "$(classification_block)"
+    printf '%s\n\n%sKontekst – komplett trigger-event (JSON):\n%s\n\n%s\n' "$prompt" "$kb" "$event_json" "$(classification_block)"
   else
-    printf 'Du har mottatt et eksternt trigger-event (f.eks. fra Slack eller GitHub).\nUtfør oppgaven eventet beskriver. Arbeidskatalogen er /workspace.\n\nEvent (JSON):\n%s\n\n%s\n' "$event_json" "$(classification_block)"
+    printf 'Du har mottatt et eksternt trigger-event (f.eks. fra Slack eller GitHub).\nUtfør oppgaven eventet beskriver. Arbeidskatalogen er /workspace.\n\n%sEvent (JSON):\n%s\n\n%s\n' "$kb" "$event_json" "$(classification_block)"
   fi
 }
 
@@ -160,9 +251,14 @@ watch_loop() {
       fi
       process_event "$line"
     done
+    if synthesis_due; then
+      run_synthesis
+    fi
     sleep "$POLL_INTERVAL"
   done
 }
+
+sync_knowledge
 
 cmd="${1:-watch}"
 case "$cmd" in

@@ -73,11 +73,23 @@ Agentene holdes uavhengige av hverandre: hver agent eier sin egen
 flere agenter samtidig (f.eks. per kilde eller intent) er et naturlig neste
 steg i integrations.
 
+## Dokumentasjon og kunnskap
+
+Repo-spesifikke læringspunkter og dokumentasjon ligger i [`doc/`](doc/)
+(OKF-konvensjoner: markdown + frontmatter, `index.md` som inngangsport).
+Overordnet kunnskap på tvers av repoer hører hjemme i agentens sentrale
+kunnskapsbase: et privat, instans-spesifikt repo som klones til
+anker-folderen `workspaces_knowledge/` (gitignorert) og mountes inn i
+proxy-agenten som `/knowledge`. Se planen i
+[`doc/plans/kunnskap-og-laering.md`](doc/plans/kunnskap-og-laering.md).
+
 ## Sikkerhetsmodell
 
-- Bare `integrations/` har Slack-/GitHub-tokens; agentene ser kun jsonl-filene
-  og sitt eget `workspace/`. Ett bevisst unntak: proxy-agent kan få et snevert
-  `GH_TOKEN` (kun issues/PR-er, ingen kode-tilgang) for github-skillen — se
+- Bare `integrations/` har Slack-/GitHub-tokens; agentene ser kun jsonl-filene,
+  sitt eget `workspace/` og sin egen kunnskapsbase. To bevisste, snevre unntak
+  hos proxy-agent: `GH_TOKEN` (kun issues/PR-er, ingen kode-tilgang) for
+  github-skillen, og `KB_GH_TOKEN` (Contents kun på det private
+  kunnskapsrepoet) for kunnskapsbasen — se
   [`agents/proxy-agent/README.md`](agents/proxy-agent/README.md).
 - Agent-containerne kjører som ikke-root med `cap_drop: ALL` og
   `no-new-privileges`, og trenger bare nettverk mot LLM-endepunktet.
