@@ -89,7 +89,18 @@ export class GithubPoller {
     // the thread id would silently drop every later interaction with an issue
     // that was already handled once in this session.
     const key = eventIdFor(n);
-    if (this.handled.has(key)) return;
+    if (this.handled.has(key)) {
+      // Already acted on this event — the thread can only reappear with the
+      // same key when markThreadRead below failed transiently. Retry just the
+      // read bookkeeping so the notification stops resurfacing every poll,
+      // without redoing the actions themselves.
+      try {
+        await this.client.markThreadRead(n.id);
+      } catch (err) {
+        log.warn(`Could not mark handled thread read on ${n.repository.full_name}; retrying next poll.`, err);
+      }
+      return;
+    }
 
     const where = `${n.repository.full_name} "${n.subject.title}"`;
 
