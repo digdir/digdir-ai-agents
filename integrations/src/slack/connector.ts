@@ -53,37 +53,66 @@ export class SlackConnector {
 
   /**
    * Delivers a result: either a threaded reply, or a silent ack that just adds
-   * the acknowledgement reaction to the original message. Either way the
-   * "working" reaction is cleared afterwards. Used by the result watcher.
+   * the acknowledgement reaction to the original message. The "working"
+   * reaction is **always** cleared afterwards — also when posting failed: a
+   * lingering :thinking_face: signals "still working" and is worse than a
+   * missing ack reaction. Used by the result watcher.
    */
   async deliver(reply: Extract<ReplyContext, { kind: "slack" }>, delivery: Delivery): Promise<void> {
-    if (delivery.kind === "message") {
-      await this.web.chat.postMessage({
-        channel: reply.channel,
-        thread_ts: reply.threadTs,
-        text: delivery.text,
-      });
-    } else if (reply.messageTs) {
-      // ack: acknowledge with a reaction on the original message.
-      await this.addReaction(reply.channel, reply.messageTs, this.config.ackReaction);
+    try {
+      if (delivery.kind === "message") {
+        await this.web.chat.postMessage({
+          channel: reply.channel,
+          thread_ts: reply.threadTs,
+          text: delivery.text,
+        });
+      } else if (reply.messageTs) {
+        // ack: acknowledge with a reaction on the original message. Best
+        // effort — a failed ack reaction must not block the cleanup below.
+        try {
+          await this.addReaction(reply.channel, reply.messageTs, this.config.ackReaction);
+        } catch (err) {
+          const code = (err as { data?: { error?: string } })?.data?.error;
+          log.warn(
+            `Could not add the ack reaction :${this.config.ackReaction}: in ${reply.channel} @ ${reply.messageTs} (${code ?? "unknown error"}).`,
+            err,
+          );
+        }
+      }
+    } finally {
+      await this.clearWorkingReaction(reply);
     }
-    await this.clearWorkingReaction(reply);
   }
 
-  /** Removes the transient "working" reaction from a message, if one was set. */
+  /**
+   * Removes the transient "working" reaction from a message, if one was set.
+   * Logs every attempt and outcome — a reaction that silently stays behind
+   * looks like the bot is still thinking (see issue #46). Never throws.
+   */
   private async clearWorkingReaction(reply: Extract<ReplyContext, { kind: "slack" }>): Promise<void> {
-    if (!reply.workingReaction || !reply.messageTs) return;
+    if (!reply.workingReaction || !reply.messageTs) {
+      log.debug(`No working reaction to clear in ${reply.channel} (workingReaction/messageTs not set on the reply context).`);
+      return;
+    }
     try {
       await this.web.reactions.remove({
         channel: reply.channel,
         timestamp: reply.messageTs,
         name: reply.workingReaction,
       });
+      log.info(`Cleared working reaction :${reply.workingReaction}: in ${reply.channel} @ ${reply.messageTs}.`);
     } catch (err) {
       const code = (err as { data?: { error?: string } })?.data?.error;
-      if (code !== "no_reaction") {
-        log.warn("Delivered the result but could not clear the working reaction.", err);
+      if (code === "no_reaction") {
+        // Nothing to remove (never added, or already removed) — worth a trace,
+        // not a warning.
+        log.info(`Working reaction :${reply.workingReaction}: in ${reply.channel} @ ${reply.messageTs} was already gone.`);
+        return;
       }
+      log.warn(
+        `Could not clear working reaction :${reply.workingReaction}: in ${reply.channel} @ ${reply.messageTs} (${code ?? "unknown error"}).`,
+        err,
+      );
     }
   }
 
