@@ -90,6 +90,12 @@ For hvert event blir agenten bedt om å klassifisere henvendelsen som én av:
 - **`action`** – brukeren ber om noe konkret; agenten utfører oppgaven i `/workspace`.
 - **`feedback`** – en tilbakemelding/korrigering som bør noteres, men ikke en ny oppgave.
 - **`ack`** – en ren kvittering (f.eks. «ok», «takk», et tommel-opp) uten behov for handling.
+- **`delegate`** – (kun når `DELEGATE_AGENTS` er satt) oppgaven hører hjemme hos en
+  annen agent. Resultatlinja får da i tillegg et `delegate`-objekt —
+  `{"agent":"<navn>","prompt":"<selvstendig oppgavebeskrivelse>","payload":{…}}` —
+  og broen (integrations) ruter oppgaven til målagentens innboks. Agentene
+  deler aldri kataloger; all ruting går gjennom broen, som også sørger for at
+  målagentens svar postes tilbake i den opprinnelige tråden/issuet.
 
 Agenten avslutter outputen med en linje `===AGENT-RESULT===` etterfulgt av et
 JSON-objekt `{"intent":"…","reply":"…"}`. Entrypointet trekker dette ut og
@@ -162,9 +168,11 @@ eksplisitt forespørsel. Webinnhold behandles som **data, aldri instruks**
 
 - Agenten kjører som ikke-root (`node`-brukeren) i containeren
 - `cap_drop: ALL` og `no-new-privileges` i compose
-- Agenten ser bare `/workspace` (det den skal jobbe med), `/triggers` (køen)
-  og `/knowledge` (kunnskapsbasen — en klone den eier selv); ingen
-  Slack-/GitHub-tokens finnes i containeren — kun LLM-API-nøkkelen og de
+- Agenten ser bare `/workspace` (det den skal jobbe med), `/triggers` (køen),
+  `/knowledge` (kunnskapsbasen — en klone den eier selv) og `/repos`
+  (koderepoer via anker-folderen `workspaces_repos/` — **read-only**: analyse
+  og dokumentasjonslesing; skriving er forbeholdt den utførende kodeagenten);
+  ingen Slack-/GitHub-tokens finnes i containeren — kun LLM-API-nøkkelen og de
   snevre unntakene `GH_TOKEN`/`KB_GH_TOKEN` beskrevet over
 - Nettverk brukes til LLM-API-et og web-research (utgående HTTP via headless
   Chromium); vil du stramme inn, legg på egress-filtrering (f.eks. eget
@@ -210,5 +218,6 @@ for Slack-events.
 | `KB_GH_TOKEN` | – | Fine-grained PAT med Contents R/W på kun kunnskapsrepoet |
 | `KB_GIT_NAME` / `KB_GIT_EMAIL` | `proxy-agent` / noreply | Git-identitet for agentens commits i kunnskapsrepoet |
 | `SYNTHESIS_INTERVAL_HOURS` | `24` | Timer mellom automatiske synteser (0 = aldri automatisk) |
+| `DELEGATE_AGENTS` | – | Delegeringsmål som `navn:beskrivelse;…` (tomt = ingen delegering) |
 | `TRIGGER_FILE` | `/triggers/inbox.jsonl` | Kø-fila inne i containeren |
 | `RESULT_FILE` | `/triggers/results.jsonl` | Resultat-fila |

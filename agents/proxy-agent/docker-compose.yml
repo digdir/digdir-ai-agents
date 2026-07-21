@@ -20,6 +20,10 @@ services:
       # Kunnskapsbase: klone av KB_REPO, forvaltes av entrypointet.
       # Anker-folder på monorepo-rot så klonen overlever restarts.
       - ../../workspaces_knowledge:/knowledge
+      # Koderepoer (anker-folder på monorepo-rot): read-only for analyse —
+      # skriving skjer hos den utførende kodeagenten, som har sin egen
+      # skrivbare tilgang til samme folder.
+      - ../../workspaces_repos:/repos:ro
       # Pi-innstillinger/sesjoner overlever container-restart
       - pi-home:/home/node/.pi
     restart: unless-stopped

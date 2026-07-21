@@ -6,6 +6,14 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-21** — Delegering mellom agenter (M1+M2 i
+  [plans/agent-delegering.md](plans/agent-delegering.md)): resultatlinjer med
+  `intent: "delegate"` rutes av integrations til målagentens innboks
+  (allowlist `AGENT_ROUTES`, hoppgrense, svar-kontekst remappes så endelig
+  svar lander i opprinnelig tråd/issue). Ny agent `local-cc-coding-agent`
+  (interaktiv Claude Code med CLAUDE.md-instruks) som utførende kodeagent;
+  proxy-agenten fikk `DELEGATE_AGENTS` og read-only `/repos`.
+
 - **2026-07-21** — M6 gjennomført: ny skill `web-research` — agenten leser
   nettsider med agent-browser (headless Chromium i imaget), arkiverer
   kilden som markdown-snapshot i KB-repoets `sources/` med proveniens

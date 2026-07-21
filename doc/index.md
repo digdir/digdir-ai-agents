@@ -18,6 +18,8 @@ kronologisk endringslogg.
 - [plans/kunnskap-og-laering.md](plans/kunnskap-og-laering.md) — plan for
   kunnskaps- og læringsprosessen i agent-pipelinen (OKF, kunnskapsrepo,
   læringsloop)
+- [plans/agent-delegering.md](plans/agent-delegering.md) — delegering mellom
+  agenter via broen, og utførende kodeagent (local-cc-coding-agent)
 
 ## Overordnet kunnskap
 

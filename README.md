@@ -23,6 +23,7 @@ Slack / GitHub
 |---|---|
 | [`integrations/`](integrations/) | Lytter på GitHub (notifications-polling) og Slack (Socket Mode), oversetter events til JSON-linjer i en agents `triggers/inbox.jsonl`, og poster svar fra `results.jsonl` tilbake dit de kom fra. |
 | [`agents/proxy-agent/`](agents/proxy-agent/) | Pi-agent isolert i Docker. Poller sin egen `triggers/inbox.jsonl`, kjører agenten per event og skriver svar til `triggers/results.jsonl`. |
+| [`agents/local-cc-coding-agent/`](agents/local-cc-coding-agent/) | Utførende kodeagent: Claude Code kjørt interaktivt fra agent-katalogen (instrukser i `CLAUDE.md`). Mottar delegerte oppgaver via samme filkontrakt og leverer branch + PR. |
 
 Kontrakten mellom integrations og agent er bevisst minimal: **to jsonl-filer i
 agentens `triggers/`-katalog**. Formatet er beskrevet i
@@ -69,9 +70,22 @@ hva som helst som oppfyller kø-kontrakten:
    `integrations/.env` (f.eks. `../agents/<navn>/triggers`).
 
 Agentene holdes uavhengige av hverandre: hver agent eier sin egen
-`triggers/`-katalog, sitt eget image og sin egen `.env`. Ruting av events til
-flere agenter samtidig (f.eks. per kilde eller intent) er et naturlig neste
-steg i integrations.
+`triggers/`-katalog, sitt eget image og sin egen `.env` — de skriver aldri i
+hverandres kataloger.
+
+## Delegering mellom agenter
+
+En agent kan sende en oppgave videre til en annen agent ved å svare med
+`intent: "delegate"` + et `delegate`-objekt i resultatlinja. **Broen gjør
+rutingen**: integrations appender oppgaven som nytt event i målagentens
+innboks (allowlist i `AGENT_ROUTES`), følger alle agenters `results.jsonl`,
+og sørger for at det endelige svaret postes tilbake i den opprinnelige
+Slack-tråden / GitHub-issuet. En hoppgrense (`AGENT_MAX_DELEGATION_HOPS`)
+hindrer at to agenter kaster en oppgave frem og tilbake. Typisk flyt:
+proxy-agenten analyserer og beskriver løsningen, og delegerer utførelsen til
+kodeagenten — som leverer branch + PR med mennesket som review-gate. Se
+[`integrations/README.md`](integrations/README.md) for kontrakten og planen i
+[`doc/plans/agent-delegering.md`](doc/plans/agent-delegering.md).
 
 ## Dokumentasjon og kunnskap
 

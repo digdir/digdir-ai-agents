@@ -29,12 +29,30 @@ export interface SlackConfig {
   ackReaction: string;
 }
 
+/** A queue-connected agent: a `triggers/` directory following the contract. */
+export interface AgentRoute {
+  name: string;
+  triggersDir: string;
+  inboxFile: string;
+  resultsFile: string;
+}
+
 export interface AgentQueueConfig {
   enabled: boolean;
   /** proxy-agent's shared `triggers/` directory. */
   triggersDir: string;
   inboxFile: string;
   resultsFile: string;
+  /** Name of the primary agent (receives external events). */
+  primaryName: string;
+  /**
+   * Delegation targets: agents another agent's result may hand a task off to
+   * (`intent: "delegate"`). Resolved from AGENT_ROUTES by the convention
+   * `<agentsDir>/<name>/triggers`. Empty = delegation disabled.
+   */
+  routes: AgentRoute[];
+  /** Max delegation hops for one originating event (loop guard). */
+  maxDelegationHops: number;
   /** integrations's own state (pending replies + results offset). */
   stateDir: string;
   resultsPollIntervalSeconds: number;
@@ -112,6 +130,9 @@ export function loadConfig(): Config {
     triggersDir: "",
     inboxFile: "",
     resultsFile: "",
+    primaryName: (process.env.AGENT_PRIMARY_NAME ?? "proxy-agent").trim(),
+    routes: [],
+    maxDelegationHops: Number(process.env.AGENT_MAX_DELEGATION_HOPS ?? "2"),
     stateDir: path.resolve((process.env.AGENT_STATE_DIR ?? ".state").trim()),
     resultsPollIntervalSeconds: Number(process.env.AGENT_RESULTS_POLL_INTERVAL ?? "5"),
     postResults: bool(process.env.AGENT_POST_RESULTS, true),
@@ -134,6 +155,30 @@ export function loadConfig(): Config {
     }
     if (!Number.isFinite(agentQueue.maxReplyChars) || agentQueue.maxReplyChars < 1) {
       throw new Error("AGENT_MAX_REPLY_CHARS must be a positive number");
+    }
+    if (!Number.isFinite(agentQueue.maxDelegationHops) || agentQueue.maxDelegationHops < 1) {
+      throw new Error("AGENT_MAX_DELEGATION_HOPS must be a positive number");
+    }
+
+    // Delegation routes: comma-separated agent names, each resolved by the
+    // monorepo convention <AGENT_AGENTS_DIR>/<name>/triggers.
+    const agentsDir = path.resolve((process.env.AGENT_AGENTS_DIR ?? "../agents").trim());
+    const routeNames = (process.env.AGENT_ROUTES ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s !== "");
+    for (const name of routeNames) {
+      if (!/^[a-zA-Z0-9._-]+$/.test(name) || name === "." || name === "..") {
+        throw new Error(`AGENT_ROUTES: invalid agent name "${name}" (allowed: letters, digits, . _ -)`);
+      }
+      if (name === agentQueue.primaryName || agentQueue.routes.some((r) => r.name === name)) continue;
+      const triggersDir = path.join(agentsDir, name, "triggers");
+      agentQueue.routes.push({
+        name,
+        triggersDir,
+        inboxFile: path.join(triggersDir, "inbox.jsonl"),
+        resultsFile: path.join(triggersDir, "results.jsonl"),
+      });
     }
   }
 

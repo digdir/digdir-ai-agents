@@ -9,7 +9,8 @@
 /** One line appended to `triggers/inbox.jsonl`. Matches proxy-agent's event format. */
 export interface QueueEvent {
   id: string;
-  source: "slack" | "github";
+  /** "agent" = a delegated task handed off from another agent. */
+  source: "slack" | "github" | "agent";
   type: string;
   received_at: string;
   prompt: string;
@@ -21,7 +22,7 @@ export interface QueueEvent {
  * the "working" reaction to clear once the answer is posted (if any). These
  * fields are persisted in the pending map, so cleanup survives a restart.
  */
-export type ReplyContext =
+export type ReplyContext = (
   | {
       kind: "slack";
       channel: string;
@@ -39,7 +40,11 @@ export type ReplyContext =
       /** Reactions endpoint + id of the working reaction to remove once answered. */
       reactionsUrl?: string;
       reactionId?: number;
-    };
+    }
+) & {
+  /** Delegation hops consumed for this originating event (loop guard). */
+  hops?: number;
+};
 
 /**
  * One line read from `triggers/results.jsonl`, written by proxy-agent. `intent`
@@ -52,9 +57,18 @@ export interface ResultLine {
   exit_code?: number;
   log?: string;
   /** How the agent classified the input. */
-  intent?: "action" | "feedback" | "ack" | string;
+  intent?: "action" | "feedback" | "ack" | "delegate" | string;
   /** Clean answer text to post back (as opposed to the raw log). */
   reply?: string;
+  /** With `intent: "delegate"`: the task to hand off to another agent. */
+  delegate?: {
+    /** Target agent name — must match a configured route. */
+    agent?: string;
+    /** Complete, self-contained task description for the target agent. */
+    prompt?: string;
+    /** Optional extra context (e.g. an issue URL) passed into the event. */
+    payload?: Record<string, unknown>;
+  };
   started_at?: string;
   finished_at?: string;
 }
