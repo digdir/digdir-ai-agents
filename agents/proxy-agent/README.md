@@ -100,6 +100,22 @@ faller da tilbake til å poste hele loggen.
 Mottakeren bruker `intent` til å avgjøre responsen: `action`/`feedback` postes
 som svar/kommentar, mens `ack` bare kvitteres med en emoji-reaksjon.
 
+## Skills
+
+Agenten har [Pi-skills](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md)
+bakt inn i imaget under `docker/skills/` (lastes med `--skill` fra
+entrypointet — de kan ikke ligge i `~/.pi`, siden pi-home-volumet skygger
+image-innhold). Ny skill = ny katalog med en `SKILL.md` + rebuild.
+
+### github-issues-prs
+
+Lar agenten opprette, kommentere og administrere GitHub-issues og PR-er via
+`gh` CLI. Krever `GH_TOKEN` i `.env`: en **fine-grained PAT med kun Issues +
+Pull requests (Read/Write) og Metadata (Read)** på de aktuelle repoene. Dette
+er et bevisst, snevert unntak fra prinsippet om at agenten ikke har tokens —
+tokenet gir ikke tilgang til kode, og skillen instruerer agenten om at
+kodearbeid hører til en annen agent i pipelinen.
+
 ## Isolasjon
 
 - Agenten kjører som ikke-root (`node`-brukeren) i containeren

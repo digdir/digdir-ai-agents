@@ -6,6 +6,20 @@ RUN apt-get update \
 
 RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
+# GitHub CLI — brukes av github-issues-prs-skillen (auth via GH_TOKEN)
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      >/etc/apt/sources.list.d/github-cli.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends gh \
+  && rm -rf /var/lib/apt/lists/*
+
+# Skills bakes inn utenfor /home/node/.pi — pi-home-volumet ville ellers
+# skygget dem ved image-oppdateringer. Entrypointet laster dem med --skill.
+COPY skills /opt/pi-skills
+RUN find /opt/pi-skills -type f -exec sed -i 's/\r$//' {} +
+
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 # CRLF-stripp i tilfelle imaget bygges fra en Windows-checkout
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \

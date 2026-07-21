@@ -76,7 +76,9 @@ steg i integrations.
 ## Sikkerhetsmodell
 
 - Bare `integrations/` har Slack-/GitHub-tokens; agentene ser kun jsonl-filene
-  og sitt eget `workspace/`.
+  og sitt eget `workspace/`. Ett bevisst unntak: proxy-agent kan få et snevert
+  `GH_TOKEN` (kun issues/PR-er, ingen kode-tilgang) for github-skillen — se
+  [`agents/proxy-agent/README.md`](agents/proxy-agent/README.md).
 - Agent-containerne kjører som ikke-root med `cap_drop: ALL` og
   `no-new-privileges`, og trenger bare nettverk mot LLM-endepunktet.
 - Ingen inngående webhooks: integrations bruker polling (GitHub) og websocket
