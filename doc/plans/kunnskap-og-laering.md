@@ -44,6 +44,30 @@ i stedet for å gjenoppdages per oppgave.
 Skillelinjen: *gjelder det flere repoer eller domenet generelt → sentral KB;
 gjelder det dette repoets kode/oppsett → `doc/`.*
 
+### Anker-foldere: innlinking av eksterne repoer
+
+To gitignorerte anker-foldere på monorepo-rot brukes til å linke inn
+eksterne repoer, og bind-mountes inn i agent-containerne:
+
+```
+workspaces_knowledge/                      # klone av kunnskapsrepoet (KB_REPO)
+workspaces_repos/<provider>/<org>/<repo>/  # koderepoer det jobbes med
+                                           # (provider: github|bitbucket|…)
+```
+
+- **Én anker = ett bind-mount** → tilgang kan gis per agent:
+  proxy-agenten mountes bare `workspaces_knowledge` (som `/knowledge`),
+  den fremtidige kodeagenten får i tillegg `workspaces_repos`
+  (som `/repos`). `/workspace` forblir per-agent scratch.
+- Klonene ligger på hosten og **overlever container-restarts** (ingen
+  re-klon), og et menneske kan inspisere/redigere kunnskapen lokalt med
+  vanlig editor — wikien er bare filer i git.
+- `<provider>/<org>/<repo>`-hierarkiet er kollisjonsfritt og
+  leverandøruavhengig (samme konvensjon som ghq/GOPATH).
+- Innholdet forvaltes av containernes entrypoints (klon hvis tom,
+  ellers pull) med de respektive tokenene; hosten stiller bare
+  katalogene til rådighet.
+
 ### Tre lag (Karpathy)
 
 | Lag | Hos oss | Muterbart? |
@@ -147,9 +171,16 @@ Format for en linje i `inbox/learnings.jsonl`:
 `doc/index.md`, `doc/log.md`, denne planen. README-peker til `doc/`.
 
 ### M2 — Lesetilgang: agenten konsulterer KB
-- `entrypoint.sh`: klon/pull kunnskapsrepoet (`KB_REPO`, f.eks.
-  `owner/repo`) til `/knowledge` ved oppstart, autentisert med
-  `KB_GH_TOKEN`. Er en av dem tom, hoppes det stille over — som `GH_TOKEN`.
+- Anker-folder `workspaces_knowledge/` på monorepo-rot (gitignorert),
+  bind-mountet som `/knowledge` i proxy-agentens compose.
+- `entrypoint.sh`: klon kunnskapsrepoet (`KB_REPO`, f.eks. `owner/repo`)
+  til `/knowledge` hvis tomt, ellers pull — autentisert med `KB_GH_TOKEN`.
+  Er en av dem tom, hoppes det stille over — som `GH_TOKEN`. Må håndtere
+  at kunnskapsrepoet kan være **helt tomt** (nyopprettet): klon fungerer,
+  og første push etablerer default branch.
+- Bootstrap: er `/knowledge` tomt etter klon, legger agenten (eller vi)
+  inn OKF-grunnstrukturen (`index.md`, `log.md`, `inbox/`, `domains/`,
+  `repos/`, `process/`) som første commit.
 - Ny skill **`knowledge-base`**: OKF-konvensjonene, naviger fra
   `/knowledge/index.md`, når KB skal konsulteres, skillet mellom
   global/repo-kunnskap.
