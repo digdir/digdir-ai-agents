@@ -7,7 +7,9 @@ an inbound webhook endpoint, so it can run entirely from your laptop.
 ## What it does
 
 **GitHub** (polls the notifications API for the token's user):
-- When the bot is **assigned** to an issue or PR → it **unassigns itself**.
+- When the bot is **assigned** to an issue or PR → the assignment is a **work
+  order**: it stays in place (the bot account owns the issue end-to-end) and
+  the issue is handed to the agent queue, same as a mention.
 - When the bot is **@-mentioned** in a comment or body → it reacts with 🚀
   (`rocket`, configurable) on the triggering comment (or the issue/PR itself).
 
@@ -104,7 +106,7 @@ only sees assignments/mentions delivered to that account's notifications.
 The notifications API does **not** work with fine-grained PATs, so credentials
 are split into two roles:
 
-- **`GITHUB_TOKEN`** — issue/PR actions (unassign, react). A **fine-grained** PAT
+- **`GITHUB_TOKEN`** — issue/PR actions (react, comment). A **fine-grained** PAT
   with Read+Write on *Issues* and *Pull requests* works, as does a classic `repo`
   token.
 - **`GITHUB_TOKEN_CLASSIC_NOTIFICATIONS`** — the notifications API. Must be a

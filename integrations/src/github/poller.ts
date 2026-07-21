@@ -112,15 +112,10 @@ export class GithubPoller {
     }
 
     try {
-      // React to @-mentions.
-      if (n.reason === "mention" || n.reason === "team_mention") {
-        await this.handleMention(n, where);
-      }
-      // Unassign self whenever currently assigned. A notification thread only
-      // carries one reason at a time, so an assignment can hide behind
-      // reason=mention when the same issue was also mentioned — checking the
-      // assignees directly makes this independent of the notification reason.
-      await this.unassignSelfIfAssigned(n, where);
+      // Mentions and assignments are both work orders: a human assigning the
+      // bot to an issue means "put the agent on this". The assignment stays
+      // in place — the bot account owns the issue until it is resolved.
+      await this.handleWorkOrder(n, where);
 
       this.handled.add(key);
       await this.client.markThreadRead(n.id);
@@ -129,29 +124,7 @@ export class GithubPoller {
     }
   }
 
-  private async unassignSelfIfAssigned(n: GithubNotification, where: string): Promise<void> {
-    if (!n.subject.url) return;
-    const issueNumber = issueNumberFrom(n.subject.url);
-    if (issueNumber === null) {
-      log.warn(`Could not resolve issue number from ${n.subject.url} on ${where}.`);
-      return;
-    }
-
-    const assignees = await this.client.listAssignees(n.subject.url);
-    if (!assignees.includes(this.login)) return; // Not assigned — nothing to do.
-
-    await this.client.removeAssignee(
-      n.repository.owner.login,
-      n.repository.name,
-      issueNumber,
-      this.login,
-    );
-    const others = assignees.filter((a) => a !== this.login);
-    const remaining = others.length ? ` (left ${others.length} other assignee(s) in place)` : "";
-    log.info(`Unassigned self from ${where} (#${issueNumber})${remaining}.`);
-  }
-
-  private async handleMention(n: GithubNotification, where: string): Promise<void> {
+  private async handleWorkOrder(n: GithubNotification, where: string): Promise<void> {
     // When we will post an answer back, react with a transient "working"
     // reaction that gets cleared once answered; otherwise leave a persistent
     // acknowledgement reaction.
@@ -162,15 +135,15 @@ export class GithubPoller {
     let reactionId: number | null = null;
     if (reactionsUrl) {
       reactionId = await this.client.addReaction(reactionsUrl, reactionName);
-      log.info(`Reacted :${reactionName}: to mention on ${where}.`);
+      log.info(`Reacted :${reactionName}: to ${n.reason} on ${where}.`);
     } else {
-      log.warn(`Mentioned on ${where} but could not resolve a reaction target.`);
+      log.warn(`Notified (${n.reason}) on ${where} but could not resolve a reaction target.`);
     }
 
-    // Hand the mention off to the agent (if the queue bridge is enabled). Pass
-    // the reaction target only when we intend to clear it after answering.
+    // Hand the work order off to the agent (if the queue bridge is enabled).
+    // Pass the reaction target only when we intend to clear it after answering.
     if (this.queue) {
-      await this.enqueueMention(
+      await this.enqueueWorkOrder(
         n,
         where,
         willClear ? reactionsUrl : null,
@@ -179,7 +152,7 @@ export class GithubPoller {
     }
   }
 
-  private async enqueueMention(
+  private async enqueueWorkOrder(
     n: GithubNotification,
     where: string,
     reactionsUrl: string | null,
@@ -188,7 +161,7 @@ export class GithubPoller {
     if (!n.subject.url) return;
     const issueNumber = issueNumberFrom(n.subject.url);
     if (issueNumber === null) {
-      log.warn(`Mentioned on ${where} but could not resolve issue number; not queued.`);
+      log.warn(`Notified (${n.reason}) on ${where} but could not resolve issue number; not queued.`);
       return;
     }
 

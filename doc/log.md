@@ -6,6 +6,14 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-21** — Prosess-hygiene i delegeringsflyten (issue #41):
+  proxy-agenten eier issues ende-til-ende — solution-proposal-skillen
+  self-assigner opprettede issues og krever `Closes #<nr>` i kodeagentens
+  PR-body; kodeagentens instruks presiserer Closes-kravet og at den aldri
+  administrerer issues; GitHub-polleren unassigner seg ikke lenger —
+  assignment fra et menneske er en arbeidsordre som legger issuen i
+  agent-køen (samme håndtering som mention).
+
 - **2026-07-21** — Fiks i integrations: GitHub-polleren deduperte på
   notifikasjonstrådens ID (stabil per issue), slik at all senere interaksjon
   med et allerede håndtert issue ble droppet stille i samme sesjon. Dedupérer
