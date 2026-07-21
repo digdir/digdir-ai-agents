@@ -133,6 +133,16 @@ Innboksen er karantene — wiki-sidene endres kun av synteseprosessen
 Repo-spesifikke læringer meldes i tillegg som issue med label `learning`
 på repoet det gjelder.
 
+### knowledge-synthesis
+
+Integrerer læringskandidatene fra `inbox/learnings.jsonl` i selve wikien:
+riktig side i `domains/`/`repos/`/`process/` (oppdatert, ikke bare
+appendert), nye sider lenkes fra `index.md`, motsigelser flagges, `log.md`
+oppdateres, innboksen tømmes, og alt committes/pushes. I watch-modus kjøres
+syntesen **automatisk** når innboksen har kandidater og det er minst
+`SYNTHESIS_INTERVAL_HOURS` (default 24) siden sist — og den kan alltid
+trigges manuelt med et event à la «kjør kunnskapssyntese».
+
 ## Isolasjon
 
 - Agenten kjører som ikke-root (`node`-brukeren) i containeren
@@ -181,5 +191,6 @@ for Slack-events.
 | `KB_REPO` | – | Kunnskapsrepo: full URL eller `owner/repo` (tomt = inaktiv) |
 | `KB_GH_TOKEN` | – | Fine-grained PAT med Contents R/W på kun kunnskapsrepoet |
 | `KB_GIT_NAME` / `KB_GIT_EMAIL` | `proxy-agent` / noreply | Git-identitet for agentens commits i kunnskapsrepoet |
+| `SYNTHESIS_INTERVAL_HOURS` | `24` | Timer mellom automatiske synteser (0 = aldri automatisk) |
 | `TRIGGER_FILE` | `/triggers/inbox.jsonl` | Kø-fila inne i containeren |
 | `RESULT_FILE` | `/triggers/results.jsonl` | Resultat-fila |

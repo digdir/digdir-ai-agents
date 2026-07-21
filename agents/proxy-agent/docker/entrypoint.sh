@@ -117,6 +117,40 @@ og deretter ett JSON-objekt (kan gå over flere linjer):
 EOF
 }
 
+# Kunnskapssyntese (M4/M5): kjøres automatisk i watch-modus når innboksen
+# har kandidater og det er minst SYNTHESIS_INTERVAL_HOURS siden sist.
+# 0 = aldri automatisk (syntese kan alltid trigges manuelt via et event).
+SYNTHESIS_INTERVAL_HOURS="${SYNTHESIS_INTERVAL_HOURS:-24}"
+SYNTHESIS_STATE_FILE="${SYNTHESIS_STATE_FILE:-/triggers/.synthesis-last}"
+
+synthesis_due() {
+  [[ "$SYNTHESIS_INTERVAL_HOURS" =~ ^[0-9]+$ ]] || return 1
+  (( SYNTHESIS_INTERVAL_HOURS > 0 )) || return 1
+  [[ -f "$KNOWLEDGE_DIR/index.md" ]] || return 1
+  [[ -s "$KNOWLEDGE_DIR/inbox/learnings.jsonl" ]] || return 1
+  local last=0 now
+  if [[ -f "$SYNTHESIS_STATE_FILE" ]]; then
+    last=$(<"$SYNTHESIS_STATE_FILE")
+    [[ "$last" =~ ^[0-9]+$ ]] || last=0
+  fi
+  now=$(date +%s)
+  (( now - last >= SYNTHESIS_INTERVAL_HOURS * 3600 ))
+}
+
+run_synthesis() {
+  local ts log_file rc
+  ts=$(date -u +%Y%m%dT%H%M%SZ)
+  log_file="$LOG_DIR/synthesis-$ts.log"
+  # Stemples før kjøring, så en feilende syntese ikke spinner hvert poll
+  date +%s >"$SYNTHESIS_STATE_FILE"
+  log "Kunnskapssyntese: starter (logg: $log_file)"
+  set +e
+  pi "${pi_args[@]}" "Kjør kunnskapssyntese på kunnskapsbasen i $KNOWLEDGE_DIR: følg prosedyren i knowledge-synthesis-skillen trinn for trinn." >"$log_file" 2>&1
+  rc=$?
+  set -e
+  log "Kunnskapssyntese: ferdig (exit $rc)"
+}
+
 # Kort hint om kunnskapsbasen, kun når den faktisk er tilgjengelig.
 knowledge_block() {
   [[ -f "$KNOWLEDGE_DIR/index.md" ]] || return 0
@@ -215,6 +249,9 @@ watch_loop() {
       fi
       process_event "$line"
     done
+    if synthesis_due; then
+      run_synthesis
+    fi
     sleep "$POLL_INTERVAL"
   done
 }

@@ -197,7 +197,7 @@ Format for en linje i `inbox/learnings.jsonl`:
 - Repo-spesifikke læringer: opprett issue med label `learning` på
   målrepoet (gjenbruker `github-issues-prs`-skillen).
 
-### M4 — Syntese og lint
+### M4 — Syntese og lint ✅
 - Ny skill **`knowledge-synthesis`**: les innboks → integrer i OKF-sider →
   oppdater kryssreferanser/`index.md`/`log.md` → flagg motsigelser → tøm
   innboks → commit/push. Trigges først manuelt (`trigger.ps1` /
@@ -205,11 +205,17 @@ Format for en linje i `inbox/learnings.jsonl`:
 - Bootstrap av KB-repoets struktur (kan gjøres av agenten selv som første
   syntese-kjøring).
 
-### M5 — Automatikk og aktiv kontekst
-- Periodisk syntese-event fra integrations (cron-aktig trigger).
-- Tidsvektet komprimering av gamle læringer (yoyo-evolve).
-- Evt. `active/`-side i KB som alltid prependes i prompten (yoyo-style
-  "active learnings") — veies mot kontekstkostnad.
+### M5 — Automatikk ✅ (aktiv kontekst utsatt)
+- Periodisk syntese kjøres av **proxy-agentens egen watch-loop** (ikke
+  integrations): fyrer når innboksen har kandidater og det er minst
+  `SYNTHESIS_INTERVAL_HOURS` (default 24, 0 = av) siden sist. Kunnskap er
+  agentens egen sak, og syntese trenger ingen Slack-/GitHub-svarrute —
+  dette lukker åpent spørsmål 3. Manuell trigging via event fungerer i
+  tillegg.
+- Tidsvektet komprimering (yoyo-evolve) ligger som regel i
+  syntese-skillen: ferske detaljer beholdes, gammelt tematiseres.
+- Utsatt: `active/`-side i KB som alltid prependes i prompten (yoyo-style
+  "active learnings") — veies mot kontekstkostnad når behovet melder seg.
 
 ## Åpne spørsmål
 
@@ -219,8 +225,7 @@ Format for en linje i `inbox/learnings.jsonl`:
 2. **Review-gate**: skal syntesen pushe rett til main i KB-repoet, eller
    levere PR med menneskelig godkjenning (tryggere mot forgiftning, mer
    friksjon)?
-3. **Scheduling**: hvor skal periodisk syntese trigges fra — integrations
-   (naturlig, den eier eventstrømmen), host-cron, eller "hver N-te event" i
-   entrypointet?
+3. **Scheduling** — *løst i M5*: syntesen trigges av proxy-agentens egen
+   watch-loop (`SYNTHESIS_INTERVAL_HOURS`); integrations er ikke involvert.
 4. **Omfang for `doc/`-flyten**: skal `learning`-issues → `doc/` gjelde alle
    digdir-repoer, eller kun dette repoet inntil kodeagenten finnes?

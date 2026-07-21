@@ -6,6 +6,12 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-21** — M4+M5 gjennomført: ny skill `knowledge-synthesis`
+  integrerer innboks-kandidater i OKF-sidene (oppdaterer index/log, flagger
+  motsigelser, tømmer innboksen, pusher), og watch-loopen kjører syntesen
+  automatisk når innboksen har kandidater og `SYNTHESIS_INTERVAL_HOURS` er
+  passert. Verifisert live: agenten opprettet `domains/digdir-ai.md` fra en
+  ekte læringskandidat og pushet selv.
 - **2026-07-21** — M3 gjennomført: agenten fanger læringer — appender
   kandidater til `inbox/learnings.jsonl` i kunnskapsrepoet og
   committer/pusher selv med bot-identitet (entrypointet konfigurerer
