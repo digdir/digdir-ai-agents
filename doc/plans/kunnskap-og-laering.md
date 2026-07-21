@@ -1,7 +1,7 @@
 ---
 type: plan
 title: Kunnskaps- og læringsprosess for agent-pipelinen
-description: Plan for hvordan agentene bygger, konsulterer og vedlikeholder kunnskap — OKF som format, knowledge-base-dd som sentral wiki, <repo>/doc for repo-spesifikk kunnskap, og en læringsloop inspirert av yoyo-evolve og Karpathys LLM-wiki.
+description: Plan for hvordan agentene bygger, konsulterer og vedlikeholder kunnskap — OKF som format, et privat instans-konfigurert kunnskapsrepo som sentral wiki, <repo>/doc for repo-spesifikk kunnskap, og en læringsloop inspirert av yoyo-evolve og Karpathys LLM-wiki.
 tags: [kunnskap, okf, skills, proxy-agent, laering]
 timestamp: 2026-07-21T00:00:00Z
 ---
@@ -28,10 +28,15 @@ i stedet for å gjenoppdages per oppgave.
 
 ### To nivåer av kunnskap
 
-1. **Sentral kunnskapsbase** — [`olebhansen-agent/knowledge-base-dd`](https://github.com/olebhansen-agent/knowledge-base-dd):
+1. **Sentral kunnskapsbase** — et **privat, instans-spesifikt repo**
+   konfigurert via env (`KB_REPO` + `KB_GH_TOKEN` i proxy-agentens `.env`):
    agentens egen OKF-wiki for overordnet kunnskap på tvers av repoer
    (domenekunnskap, prosesser/playbooks, erfaringer). Eies av bot-kontoen;
-   agenten har skrivetilgang og vedlikeholder den selv.
+   agenten har skrivetilgang og vedlikeholder den selv. Hvilken
+   kunnskapsbase en instans bruker er bevisst **usynlig i dette repoet**:
+   ulike bot-instanser (i andre organisasjoner) har sine egne private
+   kunnskapsrepoer, og kobles kun via config. Tom config = funksjonen er
+   inaktiv (samme mønster som `GH_TOKEN`).
 2. **Repo-spesifikk kunnskap** — `<repo>/doc`: læringspunkter og
    dokumentasjon som hører til ett bestemt repo, versjonert sammen med koden
    det beskriver. Samme OKF-konvensjoner. (Denne fila er første eksempel.)
@@ -60,7 +65,7 @@ event ──> proxy-agent ──> utfører oppgave ──> resultat            �
    /knowledge/inbox/learnings.jsonl                               │
                  │ 3. syntese (periodisk, egen skill)             │
                  ▼                                                │
-   OKF-wiki: knowledge-base-dd ───────────────────────────────────┘
+   OKF-wiki: kunnskapsrepoet (KB_REPO) ───────────────────────────┘
    (index.md, domains/, repos/, process/, log.md)
                  │
                  │ 4. repo-spesifikk læring uten kodetilgang:
@@ -95,10 +100,10 @@ Gjelder både KB-repoet og `<repo>/doc`:
 - `index.md` per katalognivå (progressiv navigering), `log.md` i rot
   (append-only kronologi, nyeste øverst).
 
-Foreslått struktur for `knowledge-base-dd`:
+Foreslått struktur for kunnskapsrepoet:
 
 ```
-knowledge-base-dd/
+<kb-repo>/
 ├── index.md            # inngangsport — agenten leser denne først
 ├── log.md              # kronologi
 ├── inbox/
@@ -120,9 +125,12 @@ Format for en linje i `inbox/learnings.jsonl`:
 - **To-token-modell.** Én fine-grained PAT kan ikke ha ulike rettigheter per
   repo, derfor: eksisterende `GH_TOKEN` (Issues + PR-er på digdir-repoer,
   ingen Contents) forblir urørt, og et nytt **`KB_GH_TOKEN`** utstedes fra
-  bot-kontoen med Contents Read/Write på **kun** `knowledge-base-dd`.
+  bot-kontoen med Contents Read/Write på **kun** kunnskapsrepoet.
   Verste konsekvens ved kompromittering er forurenset kunnskap — ikke
   kodetilgang.
+- **Instans-isolasjon.** `KB_REPO` og `KB_GH_TOKEN` lever kun i den
+  gitignorerte `.env`-fila. Dette repoet inneholder ingen referanse til
+  noen konkret kunnskapsbase — hver bot-instans peker på sin egen.
 - **Forgiftning (poisoning).** Alt som kommer via events er upålitelig
   input, og KB-innhold flyter tilbake inn i fremtidige prompts. Mitigering:
   (a) innboksen er karantene — kandidater blir ikke aktiv kunnskap før
@@ -139,15 +147,17 @@ Format for en linje i `inbox/learnings.jsonl`:
 `doc/index.md`, `doc/log.md`, denne planen. README-peker til `doc/`.
 
 ### M2 — Lesetilgang: agenten konsulterer KB
-- `entrypoint.sh`: klon/pull `knowledge-base-dd` til `/knowledge` ved
-  oppstart (bruk `KB_GH_TOKEN`; hopp stille over hvis tomt — som `GH_TOKEN`).
+- `entrypoint.sh`: klon/pull kunnskapsrepoet (`KB_REPO`, f.eks.
+  `owner/repo`) til `/knowledge` ved oppstart, autentisert med
+  `KB_GH_TOKEN`. Er en av dem tom, hoppes det stille over — som `GH_TOKEN`.
 - Ny skill **`knowledge-base`**: OKF-konvensjonene, naviger fra
   `/knowledge/index.md`, når KB skal konsulteres, skillet mellom
   global/repo-kunnskap.
 - Prompt-prefiks i entrypointet (vi bygger allerede prompten): kort hint om
   å sjekke `/knowledge/index.md` for relevante oppgaver.
-- `.env.example`, `docker-compose.yml`, README: dokumenter `KB_GH_TOKEN`
-  som bevisst unntak nr. 2.
+- `.env.example`, `docker-compose.yml`, README: dokumenter `KB_REPO` +
+  `KB_GH_TOKEN` som bevisst unntak nr. 2 (eksempelverdiene holdes
+  generiske — ingen konkret kunnskapsbase nevnes i repoet).
 
 ### M3 — Skrivetilgang: fangst av læringer
 - Utvid `knowledge-base`-skillen: append kandidat til
@@ -172,10 +182,9 @@ Format for en linje i `inbox/learnings.jsonl`:
 
 ## Åpne spørsmål
 
-1. **KB-repoet er utilgjengelig**: `olebhansen-agent/knowledge-base-dd` gir
-   404 både anonymt og med `gh` (privat under bot-kontoen?). Trenger:
-   bekreftelse på at det finnes, og en `KB_GH_TOKEN` (fine-grained PAT fra
-   bot-kontoen, Contents R/W kun på det repoet).
+1. **KB-tilgang**: hver instans setter `KB_REPO` + `KB_GH_TOKEN`
+   (fine-grained PAT fra bot-kontoen, Contents R/W kun på kunnskapsrepoet)
+   i sin lokale `.env` før M2 kan verifiseres ende-til-ende.
 2. **Review-gate**: skal syntesen pushe rett til main i KB-repoet, eller
    levere PR med menneskelig godkjenning (tryggere mot forgiftning, mer
    friksjon)?

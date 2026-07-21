@@ -22,5 +22,6 @@ kronologisk endringslogg.
 ## Overordnet kunnskap
 
 Kunnskap som ikke er spesifikk for dette repoet hører hjemme i agentens
-sentrale kunnskapsbase:
-[olebhansen-agent/knowledge-base-dd](https://github.com/olebhansen-agent/knowledge-base-dd).
+sentrale kunnskapsbase — et privat repo som konfigureres per bot-instans
+via `KB_REPO`/`KB_GH_TOKEN` i proxy-agentens `.env` (se
+[planen](plans/kunnskap-og-laering.md)).
