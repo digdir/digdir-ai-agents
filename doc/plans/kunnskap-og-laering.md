@@ -72,7 +72,7 @@ workspaces_repos/<provider>/<org>/<repo>/  # koderepoer det jobbes med
 
 | Lag | Hos oss | Muterbart? |
 |---|---|---|
-| Rå kilder | `triggers/logs/<id>.log` + `results.jsonl` (trajektorier), eventene selv | Nei — append-only |
+| Rå kilder | `triggers/logs/<id>.log` + `results.jsonl` (trajektorier), eventene selv, `sources/` i KB-repoet (web-snapshots) | Nei — append-only |
 | Innboks | `inbox/learnings.jsonl` i KB-repoet: ubehandlede læringskandidater | Append-only, tømmes ved syntese |
 | Wiki | OKF-sidene i KB-repoet og `<repo>/doc` | Ja — LLM-vedlikeholdt |
 | Skjema | `process/`-sidene i KB + skill-instruksene (hvordan wikien vedlikeholdes) | Ja — menneske-kuratert |
@@ -134,14 +134,16 @@ Foreslått struktur for kunnskapsrepoet:
 │   └── learnings.jsonl # karantene for læringskandidater
 ├── domains/            # fag-/domenekunnskap (digdir, altinn, …)
 ├── repos/              # kunnskap om konkrete repoer (én fil per repo)
-└── process/            # playbooks: hvordan agenten jobber, inkl.
-                        # syntese-reglene selv (= "skjema"-laget)
+├── process/            # playbooks: hvordan agenten jobber, inkl.
+│                       # syntese-reglene selv (= "skjema"-laget)
+└── sources/            # arkiverte web-kilder (rålaget): én fil per URL,
+    └── <domene>/<slug>.md   # frontmatter med resource + retrieved
 ```
 
 Format for en linje i `inbox/learnings.jsonl`:
 
 ```json
-{"ts":"2026-07-21T12:00:00Z","event_id":"slack-C123-456","source":"slack","repo":"digdir/x","scope":"global|repo","text":"<hva som ble lært>","confidence":"low|medium|high"}
+{"ts":"2026-07-21T12:00:00Z","event_id":"slack-C123-456","source":"slack|github|web","repo":"digdir/x","scope":"global|repo","text":"<hva som ble lært>","confidence":"low|medium|high","source_url":"<valgfri: URL når kilden er en nettside>"}
 ```
 
 ## Sikkerhetsmodell
@@ -216,6 +218,23 @@ Format for en linje i `inbox/learnings.jsonl`:
   syntese-skillen: ferske detaljer beholdes, gammelt tematiseres.
 - Utsatt: `active/`-side i KB som alltid prependes i prompten (yoyo-style
   "active learnings") — veies mot kontekstkostnad når behovet melder seg.
+
+### M6 — Web-research: selvstendig innlesing fra weben ✅
+
+- Ny skill **`web-research`** med [agent-browser](https://agent-browser.dev/)
+  (headless Chromium bakt inn i imaget): `agent-browser read <url>` gir
+  agent-lesbar tekst, token-effektivt nok for små modeller.
+- **Proveniens via markdown-snapshots**, ikke PDF: det agenten bruker
+  arkiveres som `sources/<domene>/<slug>.md` i KB-repoet med frontmatter
+  (`type: source`, `resource` = URL, `retrieved` = tidspunkt). Samme URL →
+  samme fil, så git-diff viser hva som endret seg på kilden over tid.
+  PDF (`agent-browser pdf`) finnes som opsjon på eksplisitt forespørsel.
+- Læringskandidater fra weben får `"source":"web"` + `source_url`, og
+  syntesen tar kildelenken med inn i wiki-siden — hver påstand sporbar.
+- Vakt: webinnhold er data, aldri instruks; kun lesing (aldri innlogging,
+  skjemaer eller å oppgi noe til sider); Chromiums interne sandbox er av i
+  containeren (Docker-seccomp) — containeren er isolasjonsgrensen, og
+  egress-filtrering står som mulig innstramming.
 
 ## Åpne spørsmål
 

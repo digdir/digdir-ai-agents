@@ -6,6 +6,20 @@ RUN apt-get update \
 
 RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
+# agent-browser + Chromium — brukes av web-research-skillen. Vi bruker
+# Debians chromium-pakke (arkitektur-riktig, apt-forvaltede avhengigheter)
+# i stedet for agent-browsers egen Chrome-nedlasting.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends chromium \
+  && rm -rf /var/lib/apt/lists/* \
+  && npm install -g agent-browser
+# Chromiums eget sandbox-lag krever user namespaces som Dockers default
+# seccomp-profil blokkerer for ikke-root; containeren er isolasjonsgrensen.
+# --disable-dev-shm-usage: /dev/shm er bare 64MB i Docker som standard.
+ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium \
+    CHROMIUM_FLAGS="--no-sandbox --disable-dev-shm-usage" \
+    AGENT_BROWSER_IDLE_TIMEOUT_MS=300000
+
 # GitHub CLI — brukes av github-issues-prs-skillen (auth via GH_TOKEN)
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
       -o /usr/share/keyrings/githubcli-archive-keyring.gpg \

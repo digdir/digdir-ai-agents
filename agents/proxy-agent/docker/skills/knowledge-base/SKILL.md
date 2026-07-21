@@ -20,6 +20,7 @@ kunnskapsgrafen.
    - `repos/` — kunnskap om konkrete repoer; sjekk `repos/<org>--<repo>.md`
      når oppgaven gjelder et bestemt repo
    - `process/` — playbooks for hvordan du jobber
+   - `sources/` — arkiverte web-kilder med proveniens (se web-research-skillen)
    - `inbox/learnings.jsonl` — dine unoterte lærdommer (karantene)
    - `log.md` — kronologi over endringer i basen
 
@@ -31,8 +32,11 @@ brukeren deg eksplisitt om å huske noe, så appendér ÉN JSON-linje til
 `/knowledge/inbox/learnings.jsonl`:
 
 ```json
-{"ts":"<UTC ISO-8601>","event_id":"<id fra eventet>","source":"slack|github","repo":"<owner/repo, eller tom>","scope":"global|repo","text":"<lærdommen, 1–3 setninger>","confidence":"low|medium|high"}
+{"ts":"<UTC ISO-8601>","event_id":"<id fra eventet>","source":"slack|github|web","repo":"<owner/repo, eller tom>","scope":"global|repo","text":"<lærdommen, 1–3 setninger>","confidence":"low|medium|high"}
 ```
+
+Kommer lærdommen fra en nettside, legg til `"source_url":"<full URL>"` —
+da er påstanden sporbar tilbake til kilden.
 
 Deretter commit og push (identitet og auth er ferdig konfigurert):
 
