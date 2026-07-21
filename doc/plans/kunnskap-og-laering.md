@@ -170,7 +170,7 @@ Format for en linje i `inbox/learnings.jsonl`:
 ### M1 — Konvensjoner og `doc/` i dette repoet ✅ (denne PR-en)
 `doc/index.md`, `doc/log.md`, denne planen. README-peker til `doc/`.
 
-### M2 — Lesetilgang: agenten konsulterer KB
+### M2 — Lesetilgang: agenten konsulterer KB ✅
 - Anker-folder `workspaces_knowledge/` på monorepo-rot (gitignorert),
   bind-mountet som `/knowledge` i proxy-agentens compose.
 - `entrypoint.sh`: klon kunnskapsrepoet (`KB_REPO`, f.eks. `owner/repo`)

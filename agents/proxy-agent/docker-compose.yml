@@ -17,6 +17,9 @@ services:
       - ./triggers:/triggers
       # Agentens arbeidskatalog (det den får lov å endre)
       - ./workspace:/workspace
+      # Kunnskapsbase: klone av KB_REPO, forvaltes av entrypointet.
+      # Anker-folder på monorepo-rot så klonen overlever restarts.
+      - ../../workspaces_knowledge:/knowledge
       # Pi-innstillinger/sesjoner overlever container-restart
       - pi-home:/home/node/.pi
     restart: unless-stopped
