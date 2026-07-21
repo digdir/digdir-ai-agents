@@ -6,6 +6,12 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-21** — M6 gjennomført: ny skill `web-research` — agenten leser
+  nettsider med agent-browser (headless Chromium i imaget), arkiverer
+  kilden som markdown-snapshot i KB-repoets `sources/` med proveniens
+  (`resource` + `retrieved`; samme URL = samme fil, git-diff viser endringer
+  på kilden), og destillerer lærdommer med `source_url`. Syntesen tar
+  kildelenker med inn i wiki-sidene.
 - **2026-07-21** — M4+M5 gjennomført: ny skill `knowledge-synthesis`
   integrerer innboks-kandidater i OKF-sidene (oppdaterer index/log, flagger
   motsigelser, tømmer innboksen, pusher), og watch-loopen kjører syntesen

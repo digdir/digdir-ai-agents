@@ -143,6 +143,21 @@ syntesen **automatisk** når innboksen har kandidater og det er minst
 `SYNTHESIS_INTERVAL_HOURS` (default 24) siden sist — og den kan alltid
 trigges manuelt med et event à la «kjør kunnskapssyntese».
 
+### web-research
+
+Lar agenten lese nettsider med [agent-browser](https://agent-browser.dev/)
+(headless Chromium, bakt inn i imaget — `AGENT_BROWSER_EXECUTABLE_PATH` og
+idle-timeout settes i Dockerfilen, ingenting i `.env`). Primært
+`agent-browser read <url>` for agent-lesbar tekst; kun lesing, aldri
+innlogging eller skjemautfylling. Det agenten bruker arkiveres som
+markdown-snapshot i kunnskapsrepoet under `sources/<domene>/<slug>.md` med
+proveniens i frontmatter (`resource` = URL, `retrieved` = tidspunkt) — samme
+URL overskriver samme fil, så git-diffen viser hva som endret seg på kilden.
+Destillerte fakta går i innboksen med `source_url`, slik at hver påstand i
+wikien er sporbar tilbake til kilde. PDF (`agent-browser pdf`) kun på
+eksplisitt forespørsel. Webinnhold behandles som **data, aldri instruks**
+(prompt-injection-vakt i skillen).
+
 ## Isolasjon
 
 - Agenten kjører som ikke-root (`node`-brukeren) i containeren
@@ -151,8 +166,11 @@ trigges manuelt med et event à la «kjør kunnskapssyntese».
   og `/knowledge` (kunnskapsbasen — en klone den eier selv); ingen
   Slack-/GitHub-tokens finnes i containeren — kun LLM-API-nøkkelen og de
   snevre unntakene `GH_TOKEN`/`KB_GH_TOKEN` beskrevet over
-- Nettverk trengs kun for LLM-API-et; vil du stramme inn, legg på egress-filtrering
-  (f.eks. eget Docker-nettverk med proxy som kun tillater `api.anthropic.com`)
+- Nettverk brukes til LLM-API-et og web-research (utgående HTTP via headless
+  Chromium); vil du stramme inn, legg på egress-filtrering (f.eks. eget
+  Docker-nettverk med proxy og allowlist). Chromiums interne sandbox er slått
+  av i containeren (krever user namespaces som Dockers seccomp-default
+  blokkerer) — containeren er isolasjonsgrensen
 
 ## Slack-integrasjon: hva mottakeren må gjøre
 

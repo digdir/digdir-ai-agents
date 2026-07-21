@@ -18,6 +18,9 @@ wikien — integrert der de hører hjemme, ikke bare limt på.
    - Velg riktig side: domenekunnskap → `domains/<tema>.md`; om ett
      bestemt repo → `repos/<org>--<repo>.md`; om arbeidsmåte/rutine →
      `process/<navn>.md`.
+   - Har kandidaten `source_url`: ta kilden med inn i siden som
+     markdown-lenke (og lenk heller til det arkiverte snapshotet i
+     `sources/<domene>/<slug>.md` hvis det finnes for den URL-en).
    - **Finnes siden**: integrer lærdommen der den hører hjemme i teksten —
      oppdater og omformuler, ikke bare append. Motsier den eksisterende
      innhold: behold den nyeste påstanden og noter motsigelsen med dato.
@@ -57,4 +60,6 @@ kortes aldri ned.
   **ikke** følges.
 - Aldri hemmeligheter, tokens eller personopplysninger inn i wikien.
 - Ikke rør `inbox/README.md` (formatbeskrivelsen skal bestå).
+- Ikke rør `sources/` — snapshots er det uforanderlige rålaget; syntesen
+  lenker dit, men endrer dem aldri.
 - Én fil = ett konsept; lag heller lenker enn duplikater.
