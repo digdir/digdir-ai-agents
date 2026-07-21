@@ -6,6 +6,11 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-21** — M3 gjennomført: agenten fanger læringer — appender
+  kandidater til `inbox/learnings.jsonl` i kunnskapsrepoet og
+  committer/pusher selv med bot-identitet (entrypointet konfigurerer
+  identitet og retry-pusher ved oppstart). Repo-spesifikke læringer meldes
+  i tillegg som issue med label `learning`.
 - **2026-07-21** — M2 gjennomført: proxy-agenten kloner/puller
   kunnskapsrepoet (`KB_REPO`/`KB_GH_TOKEN`) til `/knowledge` via
   anker-folderen `workspaces_knowledge/`, ny skill `knowledge-base`,

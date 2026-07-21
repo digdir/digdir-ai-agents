@@ -124,8 +124,14 @@ OKF-wiki-repo som entrypointet kloner/puller til `/knowledge` ved oppstart
 restarts). Konfigureres med `KB_REPO` + `KB_GH_TOKEN` i `.env` — tomt =
 inaktiv. Tokenet er en fine-grained PAT fra bot-kontoen med Contents
 Read/Write på **kun** kunnskapsrepoet, bevisst atskilt fra `GH_TOKEN`.
-Foreløpig leser agenten bare; fangst av læringer og syntese kommer som
-egne steg (se [`doc/plans/kunnskap-og-laering.md`](../../doc/plans/kunnskap-og-laering.md)).
+Agenten både leser og **fanger læringer**: etter oppgaver med reell
+læringsverdi (eller når brukeren ber den huske noe) appender den én
+JSON-linje til `inbox/learnings.jsonl` i kunnskapsrepoet og committer/pusher
+selv (identitet: `KB_GIT_NAME`/`KB_GIT_EMAIL`, default `proxy-agent`).
+Innboksen er karantene — wiki-sidene endres kun av synteseprosessen
+(se [`doc/plans/kunnskap-og-laering.md`](../../doc/plans/kunnskap-og-laering.md)).
+Repo-spesifikke læringer meldes i tillegg som issue med label `learning`
+på repoet det gjelder.
 
 ## Isolasjon
 
@@ -174,5 +180,6 @@ for Slack-events.
 | `POLL_INTERVAL` | `5` | Sekunder mellom hver sjekk av køen |
 | `KB_REPO` | – | Kunnskapsrepo: full URL eller `owner/repo` (tomt = inaktiv) |
 | `KB_GH_TOKEN` | – | Fine-grained PAT med Contents R/W på kun kunnskapsrepoet |
+| `KB_GIT_NAME` / `KB_GIT_EMAIL` | `proxy-agent` / noreply | Git-identitet for agentens commits i kunnskapsrepoet |
 | `TRIGGER_FILE` | `/triggers/inbox.jsonl` | Kø-fila inne i containeren |
 | `RESULT_FILE` | `/triggers/results.jsonl` | Resultat-fila |

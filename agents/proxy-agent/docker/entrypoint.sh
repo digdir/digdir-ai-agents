@@ -71,6 +71,15 @@ sync_knowledge() {
   else
     log "Kunnskapsbase: $KNOWLEDGE_DIR er ikke tom og ikke et git-repo – hopper over sync"
   fi
+  # Klargjør for fangst av læringer (M3): agenten committer selv i
+  # /knowledge, så repoet trenger identitet — og evt. lokale commits som
+  # ikke kom av gårde ved forrige push-feil prøves på nytt her.
+  if [[ -d "$KNOWLEDGE_DIR/.git" ]]; then
+    git -C "$KNOWLEDGE_DIR" config user.name  "${KB_GIT_NAME:-proxy-agent}" 2>/dev/null || true
+    git -C "$KNOWLEDGE_DIR" config user.email "${KB_GIT_EMAIL:-proxy-agent@users.noreply.github.com}" 2>/dev/null || true
+    git -C "$KNOWLEDGE_DIR" config pull.rebase true 2>/dev/null || true
+    git -C "$KNOWLEDGE_DIR" push --quiet 2>/dev/null || true
+  fi
 }
 
 # Skills bakt inn i imaget (se Dockerfile). Lastes eksplisitt med --skill

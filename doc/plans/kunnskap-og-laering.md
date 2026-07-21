@@ -190,7 +190,7 @@ Format for en linje i `inbox/learnings.jsonl`:
   `KB_GH_TOKEN` som bevisst unntak nr. 2 (eksempelverdiene holdes
   generiske — ingen konkret kunnskapsbase nevnes i repoet).
 
-### M3 — Skrivetilgang: fangst av læringer
+### M3 — Skrivetilgang: fangst av læringer ✅
 - Utvid `knowledge-base`-skillen: append kandidat til
   `inbox/learnings.jsonl` + commit/push med bot-identitet etter oppgaver
   med reell læringsverdi.
