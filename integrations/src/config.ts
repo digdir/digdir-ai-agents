@@ -53,6 +53,12 @@ export interface AgentQueueConfig {
   routes: AgentRoute[];
   /** Max delegation hops for one originating event (loop guard). */
   maxDelegationHops: number;
+  /**
+   * When true, the delegating agent receives a `delegation-outcome` event in
+   * its inbox once the delegated answer has been delivered. The debrief has no
+   * pending reply route and does not count as a delegation hop.
+   */
+  delegationDebrief: boolean;
   /** integrations's own state (pending replies + results offset). */
   stateDir: string;
   resultsPollIntervalSeconds: number;
@@ -133,6 +139,7 @@ export function loadConfig(): Config {
     primaryName: (process.env.AGENT_PRIMARY_NAME ?? "proxy-agent").trim(),
     routes: [],
     maxDelegationHops: Number(process.env.AGENT_MAX_DELEGATION_HOPS ?? "2"),
+    delegationDebrief: bool(process.env.AGENT_DELEGATION_DEBRIEF, true),
     stateDir: path.resolve((process.env.AGENT_STATE_DIR ?? ".state").trim()),
     resultsPollIntervalSeconds: Number(process.env.AGENT_RESULTS_POLL_INTERVAL ?? "5"),
     postResults: bool(process.env.AGENT_POST_RESULTS, true),

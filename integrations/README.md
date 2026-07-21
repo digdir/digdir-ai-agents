@@ -85,6 +85,13 @@ same machine).
   resolved as `<AGENT_AGENTS_DIR>/<name>/triggers`). Unknown targets are
   reported back to the origin instead of executed. `AGENT_MAX_DELEGATION_HOPS`
   (default 2) caps chains so two agents cannot ping-pong a task forever.
+- **Debrief** (`AGENT_DELEGATION_DEBRIEF`, default true): once the delegated
+  answer has been delivered, the delegating agent gets a `delegation-outcome`
+  event in its inbox (target agent, status, the delivered reply) so it can
+  reflect on how the delegation went. The debrief has **no** pending reply
+  route — the agent's result on it is consumed without posting anything to
+  Slack/GitHub — and it does not count as a delegation hop, so it can never
+  start a delegation loop.
 
 ## Requirements
 

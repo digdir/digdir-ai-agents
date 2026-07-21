@@ -44,6 +44,12 @@ export type ReplyContext = (
 ) & {
   /** Delegation hops consumed for this originating event (loop guard). */
   hops?: number;
+  /**
+   * Set when the pending result comes from a delegated task: who delegated it
+   * and under which event id. Used to send the delegator a `delegation-outcome`
+   * debrief event once the answer has been delivered.
+   */
+  origin?: { agent: string; eventId: string };
 };
 
 /**

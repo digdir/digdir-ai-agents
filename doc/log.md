@@ -6,6 +6,14 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-21** — Læringsløkke for delegering (issue #43): broen sender et
+  `delegation-outcome`-event til opphavsagenten når det delegerte svaret er
+  levert (`AGENT_DELEGATION_DEBRIEF`, default på; ingen svar-rute, teller
+  ikke som hopp). Proxy-agenten reflekterer ved debrief og skriver
+  prosess-læringer (`scope: "process"`, `source: "agent"`) til
+  kunnskapsrepoets innboks; kodeagenten fikk et retro-steg som avleverer
+  tilsvarende læringer før resultatlinja.
+
 - **2026-07-21** — Prosess-hygiene i delegeringsflyten (issue #41):
   proxy-agenten eier issues ende-til-ende — solution-proposal-skillen
   self-assigner opprettede issues og krever `Closes #<nr>` i kodeagentens
