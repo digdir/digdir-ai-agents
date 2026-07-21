@@ -292,8 +292,21 @@ export class AgentQueue {
   /** Reads the agent's log file for a result (empty string if unavailable). */
   private async readLog(agent: AgentRoute, result: ResultLine): Promise<string> {
     if (!result.log) return "";
+    // Reject absolute paths and traversal segments to prevent reading outside triggersDir.
+    if (path.isAbsolute(result.log) || result.log.split(path.sep).some((seg) => seg === ".." || seg === ".")) {
+      log.warn(`Rejected log path with absolute or traversal segments: ${result.log}`);
+      return "";
+    }
+    const fullPath = path.join(agent.triggersDir, result.log);
+    const resolved = path.resolve(fullPath);
+    const allowedBase = path.resolve(agent.triggersDir);
+    // Ensure the resolved path stays within triggersDir.
+    if (!resolved.startsWith(allowedBase + path.sep) && resolved !== allowedBase) {
+      log.warn(`Rejected log path resolving outside triggersDir: ${result.log}`);
+      return "";
+    }
     try {
-      return (await fs.readFile(path.join(agent.triggersDir, result.log), "utf8")).trim();
+      return (await fs.readFile(fullPath, "utf8")).trim();
     } catch (err) {
       log.warn(`Could not read log ${result.log} for "${result.id}".`, err);
       return "";

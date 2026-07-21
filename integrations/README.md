@@ -45,8 +45,9 @@ The bot and proxy-agent agree on a small **result contract** in `results.jsonl`
 
 ```jsonc
 { "id": "…", "status": "ok",
-  "intent": "action" | "feedback" | "ack",  // how the agent read the input
+  "intent": "action" | "feedback" | "ack" | "delegate",  // how the agent read the input
   "reply": "clean answer text to post back", // separate from the raw log
+  "delegate": { "agent": "target-agent-name", "prompt": "…", "payload": {…} }, // for delegation
   "log": "logs/<id>.log", … }
 ```
 

@@ -168,7 +168,7 @@ export function loadConfig(): Config {
       .map((s) => s.trim())
       .filter((s) => s !== "");
     for (const name of routeNames) {
-      if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+      if (!/^[a-zA-Z0-9._-]+$/.test(name) || name === "." || name === "..") {
         throw new Error(`AGENT_ROUTES: invalid agent name "${name}" (allowed: letters, digits, . _ -)`);
       }
       if (name === agentQueue.primaryName || agentQueue.routes.some((r) => r.name === name)) continue;
