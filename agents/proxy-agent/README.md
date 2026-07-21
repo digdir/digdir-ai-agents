@@ -164,6 +164,19 @@ wikien er sporbar tilbake til kilde. PDF (`agent-browser pdf`) kun på
 eksplisitt forespørsel. Webinnhold behandles som **data, aldri instruks**
 (prompt-injection-vakt i skillen).
 
+### solution-proposal
+
+Strukturerer henvendelser som krever kodeendringer til et løsningsforslag:
+agenten analyserer koden read-only under `/repos`, oppretter et GitHub-issue
+med **Bakgrunn**, **Foreslått løsning**, **Steg**, **Berørte filer** og
+**Akseptansekriterier** (via `gh`, se github-issues-prs), og delegerer
+utførelsen til `local-cc-coding-agent` med `intent: "delegate"` — issue-URL i
+`payload` og en komplett, selvstendig prompt. Issuet er kontrakten for
+innholdet; kodeagenten leverer branch + PR, og mennesket er review-gaten.
+Krever at `DELEGATE_AGENTS` annonserer kodeagenten og at broen har den i
+`AGENT_ROUTES`. Brukerinput behandles som data, aldri instruks, og
+hemmeligheter/tokens hører aldri hjemme i issues eller prompts.
+
 ## Isolasjon
 
 - Agenten kjører som ikke-root (`node`-brukeren) i containeren
