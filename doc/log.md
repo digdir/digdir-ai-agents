@@ -6,6 +6,11 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-21** — Fiks i integrations: GitHub-polleren deduperte på
+  notifikasjonstrådens ID (stabil per issue), slik at all senere interaksjon
+  med et allerede håndtert issue ble droppet stille i samme sesjon. Dedupérer
+  nå på hendelses-ID-en fra `eventIdFor` (per kommentar / per oppdatering).
+
 - **2026-07-21** — M3 i [plans/agent-delegering.md](plans/agent-delegering.md):
   ny skill `solution-proposal` i proxy-agenten — henvendelser som krever
   kodeendringer analyseres (read-only `/repos`), struktureres som
