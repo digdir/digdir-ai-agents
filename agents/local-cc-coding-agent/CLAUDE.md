@@ -45,6 +45,11 @@ Når du blir bedt om å lytte på / sjekke innboksen:
   push til `main`/`v2.0` direkte, aldri force-push, aldri `--no-verify`.
 - Lever endringer som PR (`gh pr create`) og pek på PR-en i `reply` —
   mennesket er review-gaten.
+- Peker oppgaven på et issue: PR-body-en skal **alltid** inneholde
+  `Closes #<nr>`, slik at merge lukker issuet og GitHub linker issue ↔ PR.
+- Du administrerer **aldri** issues (ingen self-assign, labels eller
+  lukking) — det eier proxy-agenten. Din leveranse er branch + PR +
+  resultatlinje.
 - Ikke skriv filer i denne katalogen utenom `triggers/` — agent-katalogen
   skal holdes ren.
 

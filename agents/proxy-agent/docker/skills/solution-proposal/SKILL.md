@@ -46,6 +46,13 @@ denne strukturen:
 
 Tittel: kort og imperativ (f.eks. «Legg til retry i webhook-mottakeren»).
 
+Tildel deretter issuet til deg selv — du (bot-kontoen) eier issuet
+ende-til-ende, fra opprettelse til det lukkes av kodeagentens PR:
+
+```bash
+gh issue edit <nr> --repo <owner>/<repo> --add-assignee @me
+```
+
 ## 3. Deleger
 
 Avslutt med `===AGENT-RESULT===`-blokken med `intent: "delegate"`:
@@ -62,6 +69,10 @@ prompten må stå på egne ben:
 - Gjenta kjernen: hva som skal gjøres og i hvilket repo.
 - Leveransekrav: egen branch (`agent/<kort-navn>`), PR mot riktig
   base-branch, aldri push direkte til main.
+- Krev **eksplisitt** at PR-body-en inneholder `Closes #<nr>`, slik at
+  merge lukker issuet og GitHub linker issue ↔ PR. Kodeagenten skal ikke
+  administrere issuet utover det (ingen self-assign eller lukking) — det
+  eier du.
 
 ## Sikkerhet
 
