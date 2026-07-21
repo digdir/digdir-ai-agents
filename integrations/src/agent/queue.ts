@@ -292,21 +292,17 @@ export class AgentQueue {
   /** Reads the agent's log file for a result (empty string if unavailable). */
   private async readLog(agent: AgentRoute, result: ResultLine): Promise<string> {
     if (!result.log) return "";
-    // Reject absolute paths and traversal segments to prevent reading outside triggersDir.
-    if (path.isAbsolute(result.log) || result.log.split(path.sep).some((seg) => seg === ".." || seg === ".")) {
-      log.warn(`Rejected log path with absolute or traversal segments: ${result.log}`);
-      return "";
-    }
-    const fullPath = path.join(agent.triggersDir, result.log);
-    const resolved = path.resolve(fullPath);
-    const allowedBase = path.resolve(agent.triggersDir);
-    // Ensure the resolved path stays within triggersDir.
-    if (!resolved.startsWith(allowedBase + path.sep) && resolved !== allowedBase) {
-      log.warn(`Rejected log path resolving outside triggersDir: ${result.log}`);
+    // `result.log` comes from an agent's results line — contain it to the
+    // agent's own triggers dir so a stray/hostile "../" or absolute path
+    // cannot make integrations read arbitrary files and relay them onwards.
+    const base = path.resolve(agent.triggersDir);
+    const resolved = path.resolve(base, result.log);
+    if (resolved !== base && !resolved.startsWith(base + path.sep)) {
+      log.warn(`Refusing to read log outside triggers dir for "${result.id}": ${result.log}`);
       return "";
     }
     try {
-      return (await fs.readFile(fullPath, "utf8")).trim();
+      return (await fs.readFile(resolved, "utf8")).trim();
     } catch (err) {
       log.warn(`Could not read log ${result.log} for "${result.id}".`, err);
       return "";

@@ -14,9 +14,9 @@ services:
       # Delt kø med proxy-agent: samme host-katalog som proxy-agent mounter
       # som /triggers i sin container.
       - ../agents/proxy-agent/triggers:/triggers
-      # Agentkatalog for delegering: kun hvert agents triggers-katalog mountes,
-      # slik at agents ikke kan lese hverandres .env-filer eller skrive utenfor triggers/.
-      - ../agents/proxy-agent/triggers:/agents/proxy-agent/triggers
+      # Delegeringsruter: KUN triggers-katalogen per agent i AGENT_ROUTES —
+      # aldri hele agents/-treet, som ville eksponert agentenes .env-filer.
+      # Legg til én linje per rute: ../agents/<navn>/triggers:/agents/<navn>/triggers
       - ../agents/local-cc-coding-agent/triggers:/agents/local-cc-coding-agent/triggers
       # Egen state (pending replies + results-offset) overlever restart
       - integrations-state:/state
