@@ -73,6 +73,14 @@ Agentene holdes uavhengige av hverandre: hver agent eier sin egen
 flere agenter samtidig (f.eks. per kilde eller intent) er et naturlig neste
 steg i integrations.
 
+## Dokumentasjon og kunnskap
+
+Repo-spesifikke læringspunkter og dokumentasjon ligger i [`doc/`](doc/)
+(OKF-konvensjoner: markdown + frontmatter, `index.md` som inngangsport).
+Overordnet kunnskap på tvers av repoer hører hjemme i agentens sentrale
+kunnskapsbase — se planen i
+[`doc/plans/kunnskap-og-laering.md`](doc/plans/kunnskap-og-laering.md).
+
 ## Sikkerhetsmodell
 
 - Bare `integrations/` har Slack-/GitHub-tokens; agentene ser kun jsonl-filene
