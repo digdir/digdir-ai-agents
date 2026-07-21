@@ -49,7 +49,7 @@ gjelder det dette repoets kode/oppsett → `doc/`.*
 To gitignorerte anker-foldere på monorepo-rot brukes til å linke inn
 eksterne repoer, og bind-mountes inn i agent-containerne:
 
-```
+```text
 workspaces_knowledge/                      # klone av kunnskapsrepoet (KB_REPO)
 workspaces_repos/<provider>/<org>/<repo>/  # koderepoer det jobbes med
                                            # (provider: github|bitbucket|…)
@@ -79,7 +79,7 @@ workspaces_repos/<provider>/<org>/<repo>/  # koderepoer det jobbes med
 
 ### Læringsloopen
 
-```
+```text
                  ┌───────────────── 1. konsulter ─────────────────┐
                  │                                                │
 event ──> proxy-agent ──> utfører oppgave ──> resultat            │
@@ -126,7 +126,7 @@ Gjelder både KB-repoet og `<repo>/doc`:
 
 Foreslått struktur for kunnskapsrepoet:
 
-```
+```text
 <kb-repo>/
 ├── index.md            # inngangsport — agenten leser denne først
 ├── log.md              # kronologi

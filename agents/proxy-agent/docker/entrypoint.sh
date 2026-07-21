@@ -78,6 +78,8 @@ sync_knowledge() {
     git -C "$KNOWLEDGE_DIR" config user.name  "${KB_GIT_NAME:-proxy-agent}" 2>/dev/null || true
     git -C "$KNOWLEDGE_DIR" config user.email "${KB_GIT_EMAIL:-proxy-agent@users.noreply.github.com}" 2>/dev/null || true
     git -C "$KNOWLEDGE_DIR" config pull.rebase true 2>/dev/null || true
+    # Første push mot et nyopprettet (tomt) repo skal etablere upstream selv
+    git -C "$KNOWLEDGE_DIR" config push.autoSetupRemote true 2>/dev/null || true
     git -C "$KNOWLEDGE_DIR" push --quiet 2>/dev/null || true
   fi
 }

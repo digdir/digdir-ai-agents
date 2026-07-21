@@ -22,7 +22,7 @@ wikien — integrert der de hører hjemme, ikke bare limt på.
      oppdater og omformuler, ikke bare append. Motsier den eksisterende
      innhold: behold den nyeste påstanden og noter motsigelsen med dato.
    - **Ny side**: opprett med YAML-frontmatter:
-     ```
+     ```yaml
      ---
      type: concept
      title: <tittel>
