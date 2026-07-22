@@ -172,7 +172,7 @@ export class AgentQueue {
 
     this.pending.delete(result.id);
     await this.persistPending();
-    await this.sendDebrief(agent, result, reply);
+    await this.sendDebrief(agent, result, reply, delivery);
   }
 
   /**
@@ -244,7 +244,7 @@ export class AgentQueue {
    * (for the same reason) it can never start a new delegation, so no hop is
    * spent. Best effort: a failed append is logged and dropped, never retried.
    */
-  private async sendDebrief(from: AgentRoute, result: ResultLine, reply: ReplyContext): Promise<void> {
+  private async sendDebrief(from: AgentRoute, result: ResultLine, reply: ReplyContext, delivery: Delivery): Promise<void> {
     const origin = reply.origin;
     if (!this.config.delegationDebrief || !origin) return;
     const originAgent = this.agents.find((a) => a.name === origin.agent);
@@ -252,7 +252,9 @@ export class AgentQueue {
       log.warn(`No agent "${origin.agent}" configured for the debrief of "${result.id}" — skipping.`);
       return;
     }
-    const summary = truncate((result.reply ?? "").trim(), 2000);
+    // Use the actual delivered text (which may include error-wrapped or fallback text).
+    const deliveredText = delivery.kind === "message" ? delivery.text : (result.reply ?? "").trim();
+    const summary = truncate(deliveredText, 2000);
     const event: QueueEvent = {
       id: `${origin.eventId}-outcome`.replace(/[^a-zA-Z0-9._-]/g, "_"),
       source: "agent",
@@ -265,7 +267,7 @@ export class AgentQueue {
       payload: {
         delegated_to: from.name,
         status: result.status,
-        reply: truncate((result.reply ?? "").trim(), this.config.maxReplyChars),
+        reply: truncate(deliveredText, this.config.maxReplyChars),
         origin_event_id: origin.eventId,
       },
     };
