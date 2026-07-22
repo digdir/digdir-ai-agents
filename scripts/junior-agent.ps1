@@ -16,6 +16,9 @@
 $env:ANTHROPIC_BASE_URL = "http://127.0.0.1:1234"
 $env:ANTHROPIC_AUTH_TOKEN = "lmstudio"
 $env:ANTHROPIC_MODEL = "ornith-1.0-35b-nvfp4-mtp"
+# Uten denne går Claude Codes bakgrunnskall mot et claude-*-modellnavn som
+# ikke finnes i LM Studio; pek dem på samme lokale modell.
+$env:ANTHROPIC_SMALL_FAST_MODEL = "ornith-1.0-35b-nvfp4-mtp"
 
 Push-Location (Join-Path (Split-Path $PSScriptRoot -Parent) "agents\local-cc-jr-developer")
 try {
