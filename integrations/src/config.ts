@@ -68,10 +68,35 @@ export interface AgentQueueConfig {
   maxReplyChars: number;
 }
 
+/**
+ * First-line router (optional): classifies incoming events with a small LLM
+ * and matches them against open activities with embeddings, before they are
+ * appended to an agent's inbox. Empty `baseUrl` = router off — events are
+ * queued exactly as before (backward compatible).
+ */
+export interface RouterConfig {
+  enabled: boolean;
+  /** OpenAI-compatible endpoint, e.g. http://host.docker.internal:1234/v1. */
+  baseUrl: string;
+  /** Chat model for classification. Empty = classification off. */
+  model: string;
+  /** Sent as a Bearer token (local servers accept any non-empty value). */
+  apiKey: string;
+  /** Embedding model for activity matching. Empty = matching off. */
+  embeddingModel: string;
+  /** Per-call timeout; on timeout the event is queued unannotated. */
+  timeoutMs: number;
+  /** Cosine-similarity threshold [0..1] for a related-activity match. */
+  matchThreshold: number;
+  /** Max related activities annotated per event. */
+  maxRelated: number;
+}
+
 export interface Config {
   github: GithubConfig;
   slack: SlackConfig;
   agentQueue: AgentQueueConfig;
+  router: RouterConfig;
 }
 
 function bool(value: string | undefined, fallback = false): boolean {
@@ -189,5 +214,35 @@ export function loadConfig(): Config {
     }
   }
 
-  return { github, slack, agentQueue };
+  const router: RouterConfig = {
+    enabled: false,
+    baseUrl: (process.env.ROUTER_BASE_URL ?? "").trim().replace(/\/+$/, ""),
+    model: (process.env.ROUTER_MODEL ?? "").trim(),
+    apiKey: (process.env.ROUTER_API_KEY ?? "").trim(),
+    embeddingModel: (process.env.ROUTER_EMBEDDING_MODEL ?? "").trim(),
+    timeoutMs: Number(process.env.ROUTER_TIMEOUT_MS ?? "10000"),
+    matchThreshold: Number(process.env.ROUTER_MATCH_THRESHOLD ?? "0.7"),
+    maxRelated: Number(process.env.ROUTER_MAX_RELATED ?? "3"),
+  };
+  router.enabled = router.baseUrl !== "";
+
+  if (router.enabled) {
+    if (!router.model && !router.embeddingModel) {
+      throw new Error(
+        "ROUTER_BASE_URL is set but neither ROUTER_MODEL nor ROUTER_EMBEDDING_MODEL is — " +
+          "set at least one, or unset ROUTER_BASE_URL to disable the router.",
+      );
+    }
+    if (!Number.isFinite(router.timeoutMs) || router.timeoutMs < 1) {
+      throw new Error("ROUTER_TIMEOUT_MS must be a positive number of milliseconds");
+    }
+    if (!Number.isFinite(router.matchThreshold) || router.matchThreshold < 0 || router.matchThreshold > 1) {
+      throw new Error("ROUTER_MATCH_THRESHOLD must be a number between 0 and 1");
+    }
+    if (!Number.isFinite(router.maxRelated) || router.maxRelated < 1) {
+      throw new Error("ROUTER_MAX_RELATED must be a positive number");
+    }
+  }
+
+  return { github, slack, agentQueue, router };
 }
