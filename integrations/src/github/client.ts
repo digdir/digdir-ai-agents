@@ -155,7 +155,35 @@ export class GithubClient {
     }
   }
 
+  /** Returns the author login of a GitHub resource (issue, PR, or comment) given its API URL. */
+  async getResourceAuthor(url: string): Promise<string | null> {
+    const res = await fetch(url, { headers: this.headers(this.actionToken) });
+    if (!res.ok) {
+      throw new Error(`GET ${url} failed: ${res.status} ${await res.text()}`);
+    }
+    const body = (await res.json()) as { user?: { login: string } };
+    return body.user?.login ?? null;
+  }
+
+  /** Returns the actor who performed the most recent assignment to the given bot login. */
+  async getLastAssigner(owner: string, repo: string, issueNumber: number, botLogin: string): Promise<string | null> {
+    const url = `${this.baseUrl}/repos/${owner}/${repo}/issues/${issueNumber}/events`;
+    const res = await fetch(url, { headers: this.headers(this.actionToken) });
+    if (!res.ok) {
+      throw new Error(`GET ${url} failed: ${res.status} ${await res.text()}`);
+    }
+    const events = (await res.json()) as Array<{
+      event: string;
+      assignee?: { login: string };
+      actor: { login: string };
+    }>;
+
+    const lastAssignEvent = events.find((e) => e.event === "assigned" && e.assignee?.login === botLogin);
+    return lastAssignEvent?.actor.login ?? null;
+  }
+
   /** Fetches the body text at an issue/PR or comment API URL (for prompts). */
+
   async getBody(url: string): Promise<string> {
     const res = await fetch(url, { headers: this.headers(this.actionToken) });
     if (!res.ok) {

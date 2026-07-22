@@ -112,6 +112,38 @@ export class GithubPoller {
     }
 
     try {
+      let actorLogin: string | null = null;
+      if (n.reason === "assign") {
+        const issueNum = issueNumberFrom(n.subject.url);
+        if (issueNum != null) {
+          actorLogin = await this.client.getLastAssigner(
+            n.repository.owner.login,
+            n.repository.name,
+            issueNum,
+            this.login,
+          );
+        }
+      } else {
+        // For mentions/team_mentions, check the author of the triggering comment or issue body.
+        const sourceUrl = n.subject.latest_comment_url ?? n.subject.url;
+        if (sourceUrl) {
+          actorLogin = await this.client.getResourceAuthor(sourceUrl);
+        }
+      }
+
+      if (actorLogin === this.login) {
+        log.debug(`Skipping self-triggered ${n.reason} on ${where}.`);
+        await this.client.markThreadRead(n.id);
+        return;
+      }
+    } catch (err) {
+      log.warn(
+        `Could not determine actor for ${n.reason} on ${where}; proceeding as human-triggered to be safe.`,
+        err,
+      );
+    }
+
+    try {
       // Mentions and assignments are both work orders: a human assigning the
       // bot to an issue means "put the agent on this". The assignment stays
       // in place — the bot account owns the issue until it is resolved.
