@@ -6,6 +6,17 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — Sikkerhet: hard allowlist for GitHub-initierte
+  agent-aksjoner (issue #70): kun logins i `GITHUB_ALLOWED_USERS` kan utløse
+  arbeidsordrer fra GitHub. Aktøren slås opp per notifikasjon før alt annet
+  (assign → siste `assigned`-event; mention → forfatteren av innholdet som
+  blir prompten). Ikke på lista: WARN-logg med aktør/repo/issue/reason, tråd
+  markert lest, ingen reaksjon/kø/router-kall. Fail-closed: tom liste (med
+  oppstartsadvarsel) eller feilet aktør-oppslag dropper eventet. Botens egne
+  hendelser skippes fortsatt stille på debug-nivå (#63). Restrisiko
+  (innholds-injection via godkjente brukere) dokumentert i
+  integrations/README.
+
 - **2026-07-22** — Læringsrunde etter dagens hendelser: agent-promptene er
   strammet opp mot fire observerte feilmønstre. (1) Proxyen forsøkte å kode
   selv på detaljerte issue-tekster (PR #73/#75) — entrypoint-prompten og
