@@ -100,6 +100,36 @@ pwsh scripts\self-update.ps1 -WatchSeconds 300   # følg deploy-branchen, poll h
 For ubemannet drift kan skriptet registreres som gjentakende oppgave i Task
 Scheduler i stedet for `-WatchSeconds`.
 
+### Dedikert deploy-klone
+
+Watcheren gjør `git pull` i klonen den kjører fra, og guardene (kun
+deploy-branchen, kun ren arbeidskopi) stopper den så snart du utvikler i
+samme klone. Kjør den derfor fra en egen klone som watcheren eier alene:
+
+```powershell
+git clone https://github.com/digdir/digdir-ai-agents.git C:\data\deploy\digdir-ai-agents
+cd C:\data\deploy\digdir-ai-agents
+git checkout v2.0
+Copy-Item <dev-klone>\integrations\.env integrations\           # .env er gitignorert
+Copy-Item <dev-klone>\agents\proxy-agent\.env agents\proxy-agent\
+pwsh scripts\self-update.ps1 -WatchSeconds 300
+```
+
+Merk:
+
+- **Kjør bare én klynge om gangen.** Compose-prosjektnavnet
+  (`digdir-ai-agents`) er felles, så `up` fra én klone tar over containerne
+  fra den andre (mountene peker da på den klonens kataloger). Det hindrer
+  dobbeltkonsumering av innboksene — men vær bevisst på hvilken klone som
+  «eier» klyngen.
+- **Kø-katalogene følger klonen.** Kjører integrations fra deploy-klonen,
+  havner delegerte oppgaver i *deploy-klonens*
+  `agents/local-cc-coding-agent/triggers/` — den interaktive
+  kodeagent-sesjonen må da startes derfra også.
+- Navngitte volumer (`integrations-state`, `pi-home`) deles via
+  prosjektnavnet, så pending replies og results-offsets overlever bytte av
+  klone.
+
 ## Legge til en ny agent
 
 Pipelinen utvides ved å legge nye agenter under `agents/<navn>/`. En agent er
