@@ -354,7 +354,14 @@ export class SlackConnector {
     channel: string,
     ts: string,
   ): Promise<Array<{ ts?: string; user?: string; text?: string; thread_ts?: string }>> {
-    const res = await this.web.conversations.replies({ channel, ts, limit: 100 });
-    return (res.messages ?? []) as Array<{ ts?: string; user?: string; text?: string; thread_ts?: string }>;
+    const allMessages: Array<{ ts?: string; user?: string; text?: string; thread_ts?: string }> = [];
+    let cursor: string | undefined;
+    do {
+      const res = await this.web.conversations.replies({ channel, ts, limit: 100, cursor });
+      const messages = (res.messages ?? []) as Array<{ ts?: string; user?: string; text?: string; thread_ts?: string }>;
+      allMessages.push(...messages);
+      cursor = res.response_metadata?.next_cursor as string | undefined;
+    } while (cursor);
+    return allMessages;
   }
 }
