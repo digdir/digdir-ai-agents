@@ -165,9 +165,14 @@ export class GithubClient {
     return body.user?.login ?? null;
   }
 
-  /** Returns the actor who performed the most recent assignment to the given bot login. */
+  /**
+   * Returns the actor who performed the most recent assignment to the given bot
+   * login. Events come oldest-first; per_page=100 keeps the latest assign within
+   * the first page for all but extremely busy issues (where the lookup then
+   * returns null and the event is treated as human-triggered — fail-open).
+   */
   async getLastAssigner(owner: string, repo: string, issueNumber: number, botLogin: string): Promise<string | null> {
-    const url = `${this.baseUrl}/repos/${owner}/${repo}/issues/${issueNumber}/events`;
+    const url = `${this.baseUrl}/repos/${owner}/${repo}/issues/${issueNumber}/events?per_page=100`;
     const res = await fetch(url, { headers: this.headers(this.actionToken) });
     if (!res.ok) {
       throw new Error(`GET ${url} failed: ${res.status} ${await res.text()}`);
@@ -185,7 +190,6 @@ export class GithubClient {
   }
 
   /** Fetches the body text at an issue/PR or comment API URL (for prompts). */
-
   async getBody(url: string): Promise<string> {
     const res = await fetch(url, { headers: this.headers(this.actionToken) });
     if (!res.ok) {

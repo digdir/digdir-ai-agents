@@ -111,8 +111,8 @@ export class GithubPoller {
       return; // Leave unhandled reasons unread; do not mark as handled.
     }
 
+    let actorLogin: string | null = null;
     try {
-      let actorLogin: string | null = null;
       if (n.reason === "assign") {
         const issueNum = issueNumberFrom(n.subject.url);
         if (issueNum != null) {
@@ -124,27 +124,31 @@ export class GithubPoller {
           );
         }
       } else {
-        // For mentions/team_mentions, check the author of the triggering comment
-        // or issue body. Only attempt self-assign filtering when we have a
-        // comment URL — without it, falling back to the issue/PR creator would
-        // incorrectly filter out valid human-triggered mentions in the issue body
-        // when the bot itself created the issue/PR.
+        // For mentions/team_mentions, check the author of the triggering comment.
+        // Only filter when we have a comment URL — falling back to the issue/PR
+        // creator would incorrectly drop valid human-triggered mentions in the
+        // issue body when the bot itself created the issue/PR.
         const sourceUrl = n.subject.latest_comment_url;
         if (sourceUrl) {
           actorLogin = await this.client.getResourceAuthor(sourceUrl);
         }
-      }
-
-      if (actorLogin === this.login) {
-        log.debug(`Skipping self-triggered ${n.reason} on ${where}.`);
-        await this.client.markThreadRead(n.id);
-        return;
       }
     } catch (err) {
       log.warn(
         `Could not determine actor for ${n.reason} on ${where}; proceeding as human-triggered to be safe.`,
         err,
       );
+    }
+
+    if (actorLogin === this.login) {
+      log.debug(`Skipping self-triggered ${n.reason} on ${where}.`);
+      this.handled.add(key);
+      try {
+        await this.client.markThreadRead(n.id);
+      } catch (err) {
+        log.warn(`Could not mark self-triggered thread read on ${n.repository.full_name}; retrying next poll.`, err);
+      }
+      return;
     }
 
     try {
