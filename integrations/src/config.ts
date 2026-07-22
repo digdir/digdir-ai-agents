@@ -15,6 +15,12 @@ export interface GithubConfig {
   ackReaction: string;
   pollIntervalSeconds: number;
   apiBaseUrl: string;
+  /**
+   * GitHub logins allowed to trigger agent actions, lowercased (logins are
+   * case-insensitive). The gate is fail-closed: an empty list means every
+   * GitHub-initiated work order is dropped.
+   */
+  allowedUsers: string[];
 }
 
 export interface SlackConfig {
@@ -122,6 +128,14 @@ export function loadConfig(): Config {
     ackReaction: (process.env.GITHUB_ACK_REACTION ?? "+1").trim(),
     pollIntervalSeconds: Number(process.env.GITHUB_POLL_INTERVAL ?? "60"),
     apiBaseUrl: (process.env.GITHUB_API_URL ?? "https://api.github.com").replace(/\/+$/, ""),
+    allowedUsers: [
+      ...new Set(
+        (process.env.GITHUB_ALLOWED_USERS ?? "")
+          .split(",")
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => s !== ""),
+      ),
+    ],
   };
 
   const slack: SlackConfig = {
