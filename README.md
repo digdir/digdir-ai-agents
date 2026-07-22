@@ -88,6 +88,10 @@ single-consumer — to samtidige klynger dobbeltbehandler events):
 Restart er billig i denne arkitekturen: kø og state ligger i jsonl-filer og
 navngitte volumer, så events i innboksene overlever byttet.
 
+Skriptet er også drifts-inngangen: er koden allerede oppdatert men klyngen
+nede (første oppstart, etter reboot), startes den — én kommando dekker
+«start alt og hold det oppdatert».
+
 ```powershell
 pwsh scripts\self-update.ps1                     # én sjekk/oppgradering nå
 pwsh scripts\self-update.ps1 -WatchSeconds 300   # følg deploy-branchen, poll hvert 5. min

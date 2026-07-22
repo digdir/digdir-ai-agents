@@ -22,6 +22,9 @@
   Kø/state ligger i filer og navngitte volumer, så events i innboksene
   overlever byttet.
 
+  Skriptet er også drifts-inngangen: er koden allerede oppdatert men klyngen
+  nede (første oppstart, etter reboot), startes den. Én kommando å kjøre.
+
 .PARAMETER Branch
   Deploy-branchen som følges (default: v2.0). Arbeidskopien må stå på denne.
 
@@ -97,6 +100,17 @@ function Test-ClusterHealthy {
   return $false
 }
 
+function Start-ClusterIfDown {
+  $services = @(docker compose config --services | Where-Object { $_ })
+  $running = @(docker compose ps --status running --services | Where-Object { $_ })
+  $down = @($services | Where-Object { $running -notcontains $_ })
+  if ($down.Count -eq 0) { return }
+
+  Write-Step "Klyngen kjører ikke (mangler: $($down -join ', ')) — starter..."
+  docker compose up -d
+  if ($LASTEXITCODE -ne 0) { throw "Klarte ikke starte klyngen — se docker compose logs." }
+}
+
 function Restore-Previous {
   param([string]$OldSha, [bool]$WasClean, [string[]]$Images)
 
@@ -128,6 +142,9 @@ function Invoke-UpdatePass {
     $remoteSha = (git rev-parse "origin/$Branch").Trim()
     if ($localSha -eq $remoteSha) {
       Write-Step "Allerede på siste versjon ($($localSha.Substring(0, 7)))."
+      # Skriptet er også drifts-inngangen: sørg for at klyngen faktisk kjører
+      # (første oppstart, etter reboot med stoppede containere, o.l.).
+      Start-ClusterIfDown
       return
     }
 
