@@ -6,6 +6,17 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — PR-prosess (issue #54): plattform-håndhevet skille mellom
+  trygge og sensitive endringer. `.github/CODEOWNERS` legger menneskelig
+  eier på agent-instrukser, skills, entrypoints, `integrations/src/`,
+  Docker-filer, `scripts/` og `.github/`; sammen med branch protection
+  (approvals 0 + Require review from Code Owners + required check) kan
+  trygge PR-er auto-merges: agenten kjører reviewer-subagent, poster
+  reviewen som PR-kommentar og setter labelen `auto-merge` — en workflow
+  merger med efemer `GITHUB_TOKEN` (agent-tokens har fortsatt ingen
+  Contents-tilgang). Minimal CI (`ci.yml`, typecheck i integrations) som
+  required check. Se [pr-prosess.md](pr-prosess.md).
+
 - **2026-07-22** — Fiks: PR #55 glemte volumlinja for junior-agentens
   `triggers/` i `integrations/docker-compose.yml`, så integrations krasjet
   ved oppstart med `EACCES: mkdir /agents/local-cc-jr-developer` (køen
