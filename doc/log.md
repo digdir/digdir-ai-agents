@@ -6,6 +6,14 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — Slack-reaksjoner filtreres (issue #61): `onReaction` i
+  `SlackConnector` håndterer nå kun reaksjoner på botens egne meldinger eller
+  i tråder boten deltar i — før la den working-reaksjon på alt i alle kanaler
+  den var medlem av. Teksthentingen for reaksjons-eventer bruker
+  `conversations.replies` i stedet for `conversations.history`, som ikke ser
+  trådsvar («fant ikke meldingsteksten»); samme kall gir tråddeltakelsen, og
+  filteret evalueres før noen reaksjon legges på.
+
 - **2026-07-22** — Førstelinje-router i integrations (issue #52): innkommende
   events annoteres med `classification` (action/feedback/ack/delegate — ett
   strukturert kall mot en liten lokal modell) og `related_activities`
