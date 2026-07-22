@@ -6,6 +6,16 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — Junior-kodeagent (issue #53): ny agent
+  `local-cc-jr-developer` — Claude Code CLI mot lokal modell via LM Studios
+  Anthropic-kompatible API (`scripts/junior-agent.ps1` setter env og starter
+  CLI-en). Samme filkontrakt og protokoll som local-cc-coding-agent, med
+  eksplisitt «meld tilbake i stedet for å gjette»-instruks.
+  Solution-proposal-skillen fikk valgkriterier junior vs senior (godt
+  definert/avgrenset/lav risiko → junior; komplekst/uklart/arkitektur/
+  sikkerhet → senior), og ruting/konfig-eksempler (`AGENT_ROUTES`,
+  `DELEGATE_AGENTS`) er oppdatert.
+
 - **2026-07-22** — Drift: restart-policy gjort overstyrbar
   (`RESTART_POLICY`, default `unless-stopped`) med `scripts/dev.ps1` for
   utvikling i forgrunnen, og `scripts/self-update.ps1` for selvoppgradering

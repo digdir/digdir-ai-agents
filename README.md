@@ -23,7 +23,8 @@ Slack / GitHub
 |---|---|
 | [`integrations/`](integrations/) | Lytter på GitHub (notifications-polling) og Slack (Socket Mode), oversetter events til JSON-linjer i en agents `triggers/inbox.jsonl`, og poster svar fra `results.jsonl` tilbake dit de kom fra. |
 | [`agents/proxy-agent/`](agents/proxy-agent/) | Pi-agent isolert i Docker. Poller sin egen `triggers/inbox.jsonl`, kjører agenten per event og skriver svar til `triggers/results.jsonl`. |
-| [`agents/local-cc-coding-agent/`](agents/local-cc-coding-agent/) | Utførende kodeagent: Claude Code kjørt interaktivt fra agent-katalogen (instrukser i `CLAUDE.md`). Mottar delegerte oppgaver via samme filkontrakt og leverer branch + PR. |
+| [`agents/local-cc-coding-agent/`](agents/local-cc-coding-agent/) | Utførende kodeagent (senior): Claude Code kjørt interaktivt fra agent-katalogen (instrukser i `CLAUDE.md`). Mottar delegerte oppgaver via samme filkontrakt og leverer branch + PR. |
+| [`agents/local-cc-jr-developer/`](agents/local-cc-jr-developer/) | Junior-kodeagent: samme runtime og filkontrakt, men mot en lokal modell via LM Studios Anthropic-kompatible API (`scripts/junior-agent.ps1`). Tar godt definerte, avgrensede lav-risiko-oppgaver og melder tilbake i stedet for å gjette. |
 
 Kontrakten mellom integrations og agent er bevisst minimal: **to jsonl-filer i
 agentens `triggers/`-katalog**. Formatet er beskrevet i
