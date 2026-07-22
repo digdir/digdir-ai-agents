@@ -6,6 +6,16 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — Førstelinje-router i integrations (issue #52): innkommende
+  events annoteres med `classification` (action/feedback/ack/delegate — ett
+  strukturert kall mot en liten lokal modell) og `related_activities`
+  (embeddings-basert cosine-matching mot åpne Slack-tråder/GitHub-issues på
+  tvers av kanaler; indeksen persisteres i `integrations-state`) før de
+  appendes til innboksen. Konfigureres med `ROUTER_BASE_URL`/`ROUTER_MODEL`/
+  `ROUTER_API_KEY`/`ROUTER_EMBEDDING_MODEL` m.fl.; tom `ROUTER_BASE_URL` = av
+  (bakoverkompatibelt), og feil/timeout gir alltid uannotert event — routeren
+  annoterer bare, den dropper eller omruter aldri.
+
 - **2026-07-22** — Fiks: PR #55 glemte volumlinja for junior-agentens
   `triggers/` i `integrations/docker-compose.yml`, så integrations krasjet
   ved oppstart med `EACCES: mkdir /agents/local-cc-jr-developer` (køen

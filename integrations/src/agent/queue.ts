@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { AgentQueueConfig, AgentRoute } from "../config.ts";
 import { createLogger } from "../logger.ts";
+import type { Router } from "../router/router.ts";
 import type { Delivery, QueueEvent, ReplyContext, ResultLine, ResultPosters } from "./types.ts";
 
 const log = createLogger("queue");
@@ -31,9 +32,12 @@ export class AgentQueue {
   /** Serializes state writes so overlapping saves cannot corrupt the file. */
   private writeChain: Promise<void> = Promise.resolve();
   private readonly pendingFile: string;
+  /** Optional first-line router; annotates external events before the append. */
+  private readonly router: Router | null;
 
-  constructor(config: AgentQueueConfig) {
+  constructor(config: AgentQueueConfig, router: Router | null = null) {
     this.config = config;
+    this.router = router;
     this.pendingFile = path.join(config.stateDir, "pending.json");
     this.agents = [
       {
@@ -78,10 +82,14 @@ export class AgentQueue {
    * effectively atomic; proxy-agent only ever reads the file.
    */
   async submit(event: QueueEvent, reply: ReplyContext): Promise<void> {
-    await fs.appendFile(this.config.inboxFile, JSON.stringify(event) + "\n", "utf8");
-    this.pending.set(event.id, reply);
+    // First-line router (optional): annotate with classification and related
+    // activities before the append. annotate() never throws — on any failure
+    // or timeout the event goes through unannotated, exactly as before.
+    const enriched = this.router ? await this.router.annotate(event) : event;
+    await fs.appendFile(this.config.inboxFile, JSON.stringify(enriched) + "\n", "utf8");
+    this.pending.set(enriched.id, reply);
     await this.persistPending();
-    log.info(`Queued ${event.source} event "${event.id}" for the agent.`);
+    log.info(`Queued ${enriched.source} event "${enriched.id}" for the agent.`);
   }
 
   /**

@@ -3,6 +3,7 @@ import { createLogger } from "./logger.ts";
 import { GithubPoller } from "./github/poller.ts";
 import { SlackConnector } from "./slack/connector.ts";
 import { AgentQueue } from "./agent/queue.ts";
+import { Router } from "./router/router.ts";
 import type { ResultPosters } from "./agent/types.ts";
 
 const log = createLogger("main");
@@ -16,8 +17,14 @@ async function main(): Promise<void> {
   }
 
   const abort = new AbortController();
-  const queue = config.agentQueue.enabled ? new AgentQueue(config.agentQueue) : null;
+  // First-line router (optional): only meaningful together with the queue.
+  const router =
+    config.router.enabled && config.agentQueue.enabled
+      ? new Router(config.router, config.agentQueue.stateDir)
+      : null;
+  const queue = config.agentQueue.enabled ? new AgentQueue(config.agentQueue, router) : null;
   if (queue) await queue.init();
+  if (router) await router.init();
 
   // When we both enqueue and post answers back, connectors use a transient
   // "working" reaction that the result watcher clears once the answer arrives.
