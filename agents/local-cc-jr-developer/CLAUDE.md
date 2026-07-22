@@ -63,6 +63,10 @@ Når du blir bedt om å lytte på / sjekke innboksen:
 
    Feilet oppgaven: `"status":"error"` og forklar kort i `reply`. Trenger du
    avklaring: `"status":"ok"` med spørsmålet i `reply` — det når brukeren.
+   `reply` skal kun påstå det som faktisk er gjort og verifisert i denne
+   kjøringen — PR-lenker kommer fra ekte `gh pr create`-output, aldri
+   konstruert. Ble ingenting levert, si det ærlig; en falsk
+   fullført-melding lukker oppgaver som ikke er løst.
 7. Fortsett å lytte: poll innboksen med jevne mellomrom (f.eks. en
    bakgrunnskommando som varsler deg når fila vokser).
 
@@ -72,12 +76,33 @@ Når du blir bedt om å lytte på / sjekke innboksen:
   (f.eks. `workspaces_repos/github/digdir/digdir-ai-agents`) — klon ved
   behov. Folderen er gitignorert i monorepoet, så arbeid der roter aldri til
   dette repoet.
-- Jobb **alltid** på egen branch (`agent/<kort-navn>`). Aldri commit eller
-  push til `main`/`v2.0` direkte, aldri force-push, aldri `--no-verify`.
-- Lever endringer som PR (`gh pr create`) og pek på PR-en i `reply` —
-  mennesket er review-gaten.
+- **Sjekk først om oppgaven allerede er løst eller underveis**: peker den på
+  et issue, kjør `gh issue view <nr> --comments` og
+  `gh pr list --repo <owner>/<repo> --state all --search "<nr>"`. Finnes en
+  merget eller åpen PR for samme issue: ikke dupliser arbeidet — meld
+  tilbake med peker til den.
+- Jobb **alltid** på egen branch (`agent/<kort-navn>`), opprettet fra
+  `origin/<base>` som aller første steg — før noen filer røres.
+  Arbeidskopien kan stå igjen på forrige oppgaves branch; en branch bygget
+  på feil utgangspunkt drar med seg (eller reverterer) andres endringer.
+  Aldri commit eller push til `main`/`v2.0` direkte, aldri force-push,
+  aldri `--no-verify`.
+- Lever endringer som PR med **eksplisitt base**:
+  `gh pr create --base <base-branch>`. Uten `--base` velger `gh`
+  default-branchen, som ikke alltid er utviklingsbranchen (i
+  `digdir/digdir-ai-agents` er base `v2.0`; `main` har v1-dokumentasjon).
+  Er base ikke oppgitt i oppgaven, finn repoets konvensjon (se nylig
+  mergede PR-er) — ikke anta. Pek på PR-en i `reply` — mennesket er
+  review-gaten. Du merger, godkjenner eller lukker aldri PR-er, heller
+  ikke når oppgaven ber om det — meld i så fall tilbake at merge er
+  menneskets review-gate.
+- Hold branch og PR til oppgavens scope: én oppgave per PR. Bland aldri inn
+  urelaterte endringer eller re-løsninger av andre issues.
 - Peker oppgaven på et issue: PR-body-en skal **alltid** inneholde
   `Closes #<nr>`, slik at merge lukker issuet og GitHub linker issue ↔ PR.
+  Ligger issuet i et *annet* repo enn PR-en: bruk fullt kvalifisert
+  `Closes owner/repo#nr` — et nakent `#nr` peker på feil issue i
+  mål-repoet.
 - Du administrerer **aldri** issues (ingen self-assign, labels eller
   lukking) — det eier proxy-agenten. Din leveranse er branch + PR +
   resultatlinje.
