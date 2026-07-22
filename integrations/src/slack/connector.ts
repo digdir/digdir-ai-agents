@@ -194,15 +194,8 @@ export class SlackConnector {
       }
     }
 
-    // When we will post an answer back, react with a transient "working"
-    // reaction that gets cleared once answered; otherwise leave a persistent
-    // acknowledgement reaction.
-    const willClear = this.queue !== null && this.awaitReply;
-    const reactionName = willClear ? this.config.workingReaction : this.config.reaction;
-    await this.addReaction(event.channel, event.ts, reactionName);
-
     // Hand the message off to the agent (if the queue bridge is enabled).
-    if (this.queue) await this.enqueueMessage(event, willClear ? reactionName : undefined);
+    if (this.queue) await this.enqueueMessage(event);
   }
 
   private async enqueueMessage(event: SlackMessageEvent, workingReaction?: string): Promise<void> {
@@ -286,11 +279,6 @@ export class SlackConnector {
     const text = context?.text ?? "";
     const threadTs = context?.threadTs ?? messageTs;
 
-    // Show the working reaction on the reacted-to message while the agent runs.
-    const willClear = this.awaitReply;
-    const working = willClear ? this.config.workingReaction : this.config.reaction;
-    await this.addReaction(channel, messageTs, working);
-
     const prompt =
       `En Slack-bruker reagerte med :${event.reaction}: på følgende melding:\n\n` +
       `"${text || "(fant ikke meldingsteksten)"}"`;
@@ -299,7 +287,6 @@ export class SlackConnector {
       kind: "slack",
       channel,
       threadTs,
-      ...(willClear ? { messageTs, workingReaction: working } : {}),
     };
     await this.queue.submit(
       {
