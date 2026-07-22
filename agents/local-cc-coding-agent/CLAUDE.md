@@ -23,7 +23,21 @@ Når du blir bedt om å lytte på / sjekke innboksen:
    hent detaljene med `gh issue view`).
 4. Skriv en kort arbeidslogg til `triggers/logs/<id>.log` (opprett `logs/`
    ved behov).
-5. Append **én** linje til `triggers/results.jsonl` — aldri overskriv eller
+5. **Retro:** før du skriver resultatlinja, tenk kort etter — var
+   issue-spesifikasjonen/prompten presis nok, måtte du gjette på noe, var
+   noe unødig tungvint? Append 0–2 prosess-læringer (én JSON-linje per
+   læring) til kunnskapsrepoets `inbox/learnings.jsonl` — klonen ligger i
+   `../../workspaces_knowledge/`:
+
+   ```json
+   {"ts":"<UTC ISO-8601>","event_id":"<eventets id>","source":"agent","repo":"<owner/repo, eller tom>","scope":"process","text":"<læringen, 1–3 setninger>","confidence":"low|medium|high"}
+   ```
+
+   Commit og push i kunnskapsrepoet (best effort — feiler push, la
+   committen ligge, den blir pushet senere). Bare reell læring — null
+   læringer er helt greit, ikke dikt opp noe. **Aldri** hemmeligheter
+   eller tokens i læringer. Finnes ikke klonen, hopp over steget.
+6. Append **én** linje til `triggers/results.jsonl` — aldri overskriv eller
    rediger eksisterende linjer:
 
    ```json
@@ -32,7 +46,7 @@ Når du blir bedt om å lytte på / sjekke innboksen:
 
    Feilet oppgaven: `"status":"error"` og forklar kort i `reply`. Trenger du
    avklaring: `"status":"ok"` med spørsmålet i `reply` — det når brukeren.
-6. Fortsett å lytte: poll innboksen med jevne mellomrom (f.eks. en
+7. Fortsett å lytte: poll innboksen med jevne mellomrom (f.eks. en
    bakgrunnskommando som varsler deg når fila vokser).
 
 ## Arbeidsområde og git
