@@ -51,6 +51,85 @@ komponent kan fortsatt dras opp alene med `docker compose up` i sin katalog.
 Integrations kan også kjøres rett på hosten under utvikling (Node >= 23:
 `cd integrations && npm install && npm start`).
 
+### Utvikling i forgrunnen
+
+Default restart-policy er `unless-stopped`, slik at klyngen overlever omstart
+av Docker/maskinen. Til utvikling — logger rett i konsollen, Ctrl+C stopper
+alt, og ingenting starter igjen av seg selv — kjør:
+
+```powershell
+.\scripts\dev.ps1        # docker compose up --build uten restart-policy
+```
+
+Policyen styres av miljøvariabelen `RESTART_POLICY` i compose-filene
+(default `unless-stopped`; dev-skriptet setter `no`).
+
+## Drift og selvoppgradering
+
+Runtime-oppgradering «i fart» gjøres av
+[`scripts/self-update.ps1`](scripts/self-update.ps1), som kjører **på hosten,
+utenfor det den oppgraderer** — en container kan ikke trygt stoppe og
+gjenoppbygge seg selv, og agentene skal ikke ha Docker-tilgang (tilgang til
+docker-socketen tilsvarer root på hosten). Utløseren er merge til
+deploy-branchen: når agent-pipelinen selv har fått en PR merget, plukker
+skriptet det opp — menneskelig review forblir gaten.
+
+Skriptet følger A/B-prinsippet, men uten parallellkjøring (innboksene er
+single-consumer — to samtidige klynger dobbeltbehandler events):
+
+1. Kjørende images beholdes som `:rollback`-tag.
+2. `git pull --ff-only` (nekter ved skitten arbeidskopi), og nye images
+   **bygges mens den gamle klyngen fortsatt kjører** — byggefeil er den
+   vanligste «brick»-årsaken og gir her null nedetid.
+3. Bytte (`docker compose up -d`) og helsesjekk: containerne må kjøre stabilt
+   uten restarts, og komponentenes klar-meldinger må dukke opp i loggene.
+4. Ved feil rulles kode og images tilbake, og forrige versjon startes igjen.
+
+Restart er billig i denne arkitekturen: kø og state ligger i jsonl-filer og
+navngitte volumer, så events i innboksene overlever byttet.
+
+Skriptet er også drifts-inngangen: er koden allerede oppdatert men klyngen
+nede (første oppstart, etter reboot), startes den — én kommando dekker
+«start alt og hold det oppdatert».
+
+```powershell
+pwsh scripts\self-update.ps1                     # én sjekk/oppgradering nå
+pwsh scripts\self-update.ps1 -WatchSeconds 300   # følg deploy-branchen, poll hvert 5. min
+```
+
+For ubemannet drift kan skriptet registreres som gjentakende oppgave i Task
+Scheduler i stedet for `-WatchSeconds`.
+
+### Dedikert deploy-klone
+
+Watcheren gjør `git pull` i klonen den kjører fra, og guardene (kun
+deploy-branchen, kun ren arbeidskopi) stopper den så snart du utvikler i
+samme klone. Kjør den derfor fra en egen klone som watcheren eier alene:
+
+```powershell
+git clone https://github.com/digdir/digdir-ai-agents.git C:\data\deploy\digdir-ai-agents
+cd C:\data\deploy\digdir-ai-agents
+git checkout v2.0
+Copy-Item <dev-klone>\integrations\.env integrations\           # .env er gitignorert
+Copy-Item <dev-klone>\agents\proxy-agent\.env agents\proxy-agent\
+pwsh scripts\self-update.ps1 -WatchSeconds 300
+```
+
+Merk:
+
+- **Kjør bare én klynge om gangen.** Compose-prosjektnavnet
+  (`digdir-ai-agents`) er felles, så `up` fra én klone tar over containerne
+  fra den andre (mountene peker da på den klonens kataloger). Det hindrer
+  dobbeltkonsumering av innboksene — men vær bevisst på hvilken klone som
+  «eier» klyngen.
+- **Kø-katalogene følger klonen.** Kjører integrations fra deploy-klonen,
+  havner delegerte oppgaver i *deploy-klonens*
+  `agents/local-cc-coding-agent/triggers/` — den interaktive
+  kodeagent-sesjonen må da startes derfra også.
+- Navngitte volumer (`integrations-state`, `pi-home`) deles via
+  prosjektnavnet, så pending replies og results-offsets overlever bytte av
+  klone.
+
 ## Legge til en ny agent
 
 Pipelinen utvides ved å legge nye agenter under `agents/<navn>/`. En agent er

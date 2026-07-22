@@ -20,7 +20,9 @@ services:
       - ../agents/local-cc-coding-agent/triggers:/agents/local-cc-coding-agent/triggers
       # Egen state (pending replies + results-offset) overlever restart
       - integrations-state:/state
-    restart: unless-stopped
+    # Overstyrbar for utvikling i forgrunnen (scripts/dev.ps1 setter "no");
+    # default gjør at klyngen overlever omstart av Docker/maskinen.
+    restart: ${RESTART_POLICY:-unless-stopped}
     security_opt:
       - no-new-privileges:true
     cap_drop:
