@@ -6,6 +6,15 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — Drift: watch-modusen i `scripts/self-update.ps1` fikk
+  hurtigtaster (issue #72): `R` gjenskaper containere med oppdatert
+  `.env`-config (`docker compose up -d` + eksisterende helsesjekk — env_file
+  leses kun ved recreate, så restart holder ikke), `Q` avslutter ryddig.
+  Uendret config = ingen recreate og ingen helsesjekk-venting. Uten
+  interaktiv konsoll (redirigert stdin/tjeneste) degraderer ventingen til
+  ren sleep som før. Reload rører hverken images, git eller
+  `:rollback`-taggene.
+
 - **2026-07-22** — GitHub-polleren ignorerer selvutløste hendelser (issue
   #63): før et event køes sjekkes aktøren bak notifikasjonen — for assigns
   siste `assigned`-event fra issue-events-API-et (`getLastAssigner`). Kun
