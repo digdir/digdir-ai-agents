@@ -30,6 +30,9 @@
 
 .PARAMETER WatchSeconds
   > 0: kjør i løkke og sjekk origin hvert n-te sekund (Ctrl+C stopper).
+  I en interaktiv konsoll lytter løkka på hurtigtaster: R gjenskaper
+  containere med oppdatert .env-config (docker compose up -d + helsesjekk),
+  Q avslutter ryddig.
 
 .PARAMETER HealthTimeoutSeconds
   Hvor lenge helsesjekken venter på klar-meldinger før den konkluderer.
@@ -109,6 +112,59 @@ function Start-ClusterIfDown {
   Write-Step "Klyngen kjører ikke (mangler: $($down -join ', ')) — starter..."
   docker compose up -d
   if ($LASTEXITCODE -ne 0) { throw "Klarte ikke starte klyngen — se docker compose logs." }
+}
+
+# Gjenskaper containere med oppdatert config: env_file leses kun når en
+# container OPPRETTES, så en redigert .env krever recreate — restart holder
+# ikke. `docker compose up -d` gjenskaper bare tjenester med endret config og
+# rører hverken images, git-tilstand eller :rollback-taggene.
+function Invoke-EnvReload {
+  Push-Location $repoRoot
+  try {
+    Write-Step "Laster .env-config på nytt (docker compose up -d)..."
+    $before = @(docker compose ps -q | Where-Object { $_ } | Sort-Object) -join ","
+    $since = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    docker compose up -d
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "docker compose up feilet — se docker compose logs."
+      return
+    }
+    $after = @(docker compose ps -q | Where-Object { $_ } | Sort-Object) -join ","
+    if ($after -eq $before) {
+      Write-Step "Ingen config-endringer — containerne er uendret."
+      return
+    }
+    if (Test-ClusterHealthy -SinceIso $since -TimeoutSeconds $HealthTimeoutSeconds) {
+      Write-Step "Config lastet på nytt og klyngen verifisert."
+    } else {
+      Write-Warning "Helsesjekk feilet etter config-reload — sjekk docker compose ps / logs."
+    }
+  } finally {
+    Pop-Location
+  }
+}
+
+# Venter i inntil $Seconds, men reagerer underveis på hurtigtaster når en
+# interaktiv konsoll finnes. Uten interaktiv konsoll (redirigert stdin,
+# tjeneste) kaster KeyAvailable — da degraderer ventingen til ren sleep,
+# som før. Returnerer "reload", "quit" eller "timeout".
+function Wait-WithHotkeys([int]$Seconds) {
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      while ([Console]::KeyAvailable) {
+        $key = [Console]::ReadKey($true)
+        if ($key.Key -eq [ConsoleKey]::R) { return "reload" }
+        if ($key.Key -eq [ConsoleKey]::Q) { return "quit" }
+      }
+    } catch {
+      $rest = [int][Math]::Ceiling(($deadline - (Get-Date)).TotalSeconds)
+      if ($rest -gt 0) { Start-Sleep -Seconds $rest }
+      return "timeout"
+    }
+    Start-Sleep -Seconds 1
+  }
+  return "timeout"
 }
 
 function Restore-Previous {
@@ -195,10 +251,14 @@ function Invoke-UpdatePass {
 }
 
 if ($WatchSeconds -gt 0) {
-  Write-Step "Watch-modus: sjekker origin/$Branch hvert ${WatchSeconds}. sekund (Ctrl+C stopper)."
-  while ($true) {
+  Write-Step "Watch-modus: sjekker origin/$Branch hvert ${WatchSeconds}. sekund (R = last .env-config på nytt, Q eller Ctrl+C = avslutt)."
+  $quit = $false
+  while (-not $quit) {
     try { Invoke-UpdatePass } catch { Write-Warning $_.Exception.Message }
-    Start-Sleep -Seconds $WatchSeconds
+    switch (Wait-WithHotkeys $WatchSeconds) {
+      "reload" { try { Invoke-EnvReload } catch { Write-Warning $_.Exception.Message } }
+      "quit"   { Write-Step "Avslutter watch-modus."; $quit = $true }
+    }
   }
 } else {
   Invoke-UpdatePass
