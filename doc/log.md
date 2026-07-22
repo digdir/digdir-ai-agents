@@ -6,6 +6,13 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — Drift: restart-policy gjort overstyrbar
+  (`RESTART_POLICY`, default `unless-stopped`) med `scripts/dev.ps1` for
+  utvikling i forgrunnen, og `scripts/self-update.ps1` for selvoppgradering
+  «i fart» fra hosten — bygger nye images før den kjørende klyngen røres,
+  helsesjekker etter bytte og ruller tilbake til `:rollback`-imagene ved
+  feil. Utløser: merge til deploy-branchen.
+
 - **2026-07-21** — Prosess-hygiene i delegeringsflyten (issue #41):
   proxy-agenten eier issues ende-til-ende — solution-proposal-skillen
   self-assigner opprettede issues og krever `Closes #<nr>` i kodeagentens

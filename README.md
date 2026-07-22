@@ -51,6 +51,51 @@ komponent kan fortsatt dras opp alene med `docker compose up` i sin katalog.
 Integrations kan også kjøres rett på hosten under utvikling (Node >= 23:
 `cd integrations && npm install && npm start`).
 
+### Utvikling i forgrunnen
+
+Default restart-policy er `unless-stopped`, slik at klyngen overlever omstart
+av Docker/maskinen. Til utvikling — logger rett i konsollen, Ctrl+C stopper
+alt, og ingenting starter igjen av seg selv — kjør:
+
+```powershell
+.\scripts\dev.ps1        # docker compose up --build uten restart-policy
+```
+
+Policyen styres av miljøvariabelen `RESTART_POLICY` i compose-filene
+(default `unless-stopped`; dev-skriptet setter `no`).
+
+## Drift og selvoppgradering
+
+Runtime-oppgradering «i fart» gjøres av
+[`scripts/self-update.ps1`](scripts/self-update.ps1), som kjører **på hosten,
+utenfor det den oppgraderer** — en container kan ikke trygt stoppe og
+gjenoppbygge seg selv, og agentene skal ikke ha Docker-tilgang (tilgang til
+docker-socketen tilsvarer root på hosten). Utløseren er merge til
+deploy-branchen: når agent-pipelinen selv har fått en PR merget, plukker
+skriptet det opp — menneskelig review forblir gaten.
+
+Skriptet følger A/B-prinsippet, men uten parallellkjøring (innboksene er
+single-consumer — to samtidige klynger dobbeltbehandler events):
+
+1. Kjørende images beholdes som `:rollback`-tag.
+2. `git pull --ff-only` (nekter ved skitten arbeidskopi), og nye images
+   **bygges mens den gamle klyngen fortsatt kjører** — byggefeil er den
+   vanligste «brick»-årsaken og gir her null nedetid.
+3. Bytte (`docker compose up -d`) og helsesjekk: containerne må kjøre stabilt
+   uten restarts, og komponentenes klar-meldinger må dukke opp i loggene.
+4. Ved feil rulles kode og images tilbake, og forrige versjon startes igjen.
+
+Restart er billig i denne arkitekturen: kø og state ligger i jsonl-filer og
+navngitte volumer, så events i innboksene overlever byttet.
+
+```powershell
+pwsh scripts\self-update.ps1                     # én sjekk/oppgradering nå
+pwsh scripts\self-update.ps1 -WatchSeconds 300   # følg deploy-branchen, poll hvert 5. min
+```
+
+For ubemannet drift kan skriptet registreres som gjentakende oppgave i Task
+Scheduler i stedet for `-WatchSeconds`.
+
 ## Legge til en ny agent
 
 Pipelinen utvides ved å legge nye agenter under `agents/<navn>/`. En agent er
