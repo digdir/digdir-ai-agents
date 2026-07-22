@@ -20,8 +20,10 @@ an inbound webhook endpoint, so it can run entirely from your laptop.
   message (they are all directed at the bot).
 - In **channels, private groups, group DMs and threads** → it only reacts when
   the bot is **@-mentioned**. Other messages are ignored.
-- It also picks up **emoji reactions** on any message (`reaction_added`). When
-  the queue bridge is on, the reaction and the message it sits on are handed to
+- It also picks up **emoji reactions** (`reaction_added`) — but only on the
+  bot's **own messages** or in **threads the bot participates in**; reactions
+  elsewhere in channels it happens to be a member of are ignored. When the
+  queue bridge is on, the reaction and the message it sits on are handed to
   the agent, which interprets what the reaction means (e.g. a 👍 as positive
   feedback). The bot ignores its own reactions to avoid loops.
 
