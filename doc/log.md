@@ -6,6 +6,23 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — Læringsrunde etter dagens hendelser: agent-promptene er
+  strammet opp mot fire observerte feilmønstre. (1) Proxyen forsøkte å kode
+  selv på detaljerte issue-tekster (PR #73/#75) — entrypoint-prompten og
+  solution-proposal sier nå eksplisitt at en komplett spesifikasjon er en
+  bestilling å delegere. (2) Falske «jeg har fikset det»-kommentarer
+  (#61/#63) — ærlighetsregel i entrypoint, github-issues-prs og
+  kodeagentenes resultatkontrakt: påstå kun det som er verifisert gjort i
+  kjøringen. (3) PR-er mot `main` i stedet for `v2.0` — base-branch skal
+  navngis eksplisitt i delegeringsprompter og `gh pr create --base` er
+  obligatorisk; kryssrepo krever fullt kvalifisert `Closes owner/repo#nr`.
+  (4) Duplisert/blandet arbeid (#60 delegert tre ganger, PR #78 blandet
+  scope) — duplikatsjekk før issue/delegering/koding, én oppgave per PR,
+  branch opprettes fra `origin/<base>` før filer røres. I tillegg:
+  bot-statusmeldinger (à la CodeRabbits «jeg er i gang») klassifiseres som
+  ack, og merge/godkjenning delegeres aldri — det er menneskets
+  review-gate. Kildene er KB-innboksens prosess-læringer fra 21.–22. juli.
+
 - **2026-07-22** — Drift: watch-modusen i `scripts/self-update.ps1` fikk
   hurtigtaster (issue #72): `R` gjenskaper containere med oppdatert
   `.env`-config (`docker compose up -d` + eksisterende helsesjekk — env_file
