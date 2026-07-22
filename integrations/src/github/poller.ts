@@ -148,7 +148,7 @@ export class GithubPoller {
       log.warn(`Could not determine actor for ${n.reason} on ${where}; dropping (fail-closed).`, err);
     }
 
-    if (actorLogin === this.login) {
+    if (actorLogin?.toLowerCase() === this.login.toLowerCase()) {
       // The bot's own events are noise, not an attack — skip quietly.
       log.debug(`Skipping self-triggered ${n.reason} on ${where}.`);
       this.handled.add(key);
