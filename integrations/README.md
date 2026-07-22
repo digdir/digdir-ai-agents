@@ -12,6 +12,13 @@ an inbound webhook endpoint, so it can run entirely from your laptop.
   the issue is handed to the agent queue, same as a mention.
 - When the bot is **@-mentioned** in a comment or body → it reacts with 🚀
   (`rocket`, configurable) on the triggering comment (or the issue/PR itself).
+- Self-triggered assignment events (where the bot assigned itself) are
+  recognized by checking the actor from the issue events API and are skipped
+  (debug-logged), so the bot never loops on its own self-assignments. For
+  mention/team_mention events, the actor cannot be reliably determined from
+  the notification payload (latest_comment_url can point to stale comments),
+  so all mentions are treated as human-triggered. If the actor lookup fails,
+  the event is treated as human-triggered (work orders are never dropped silently).
 
 **Slack** (connects over Socket Mode — a websocket, no public URL needed):
 - On start it sets its presence to **active** (green dot); on shutdown it sets

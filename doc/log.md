@@ -6,6 +6,18 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — GitHub-polleren ignorerer selvutløste hendelser (issue
+  #63): før et event køes sjekkes aktøren bak notifikasjonen — for assigns
+  siste `assigned`-event fra issue-events-API-et (`getLastAssigner`). Kun
+  assignment-hendelser self-filteres når aktøren er pålitelig attribuerbar;
+  mention/team_mention-hendelser behandles alltid som menneskeutløst siden
+  aktøren ikke kan utledes pålitelig fra notifikasjonens `latest_comment_url`
+  (kan peke på eldre bot-kommentar selv om en bruker trigget hendelsen). Er
+  aktøren botens egen login markeres tråden som lest uten agent-event
+  (debug-logges). Feiler oppslaget behandles hendelsen som menneskeutløst —
+  arbeidsordrer droppes aldri stille. Stopper selvloopen opprett issue →
+  self-assign → notifikasjon → behandle eget issue.
+
 - **2026-07-22** — Slack-reaksjoner filtreres (issue #61): `onReaction` i
   `SlackConnector` håndterer nå kun reaksjoner på botens egne meldinger eller
   i tråder boten deltar i — før la den working-reaksjon på alt i alle kanaler

@@ -111,6 +111,42 @@ export class GithubPoller {
       return; // Leave unhandled reasons unread; do not mark as handled.
     }
 
+    let actorLogin: string | null = null;
+    try {
+      if (n.reason === "assign") {
+        const issueNum = issueNumberFrom(n.subject.url);
+        if (issueNum != null) {
+          actorLogin = await this.client.getLastAssigner(
+            n.repository.owner.login,
+            n.repository.name,
+            issueNum,
+            this.login,
+          );
+        }
+      }
+      // For mentions/team_mentions, the actor is not reliably attributable from
+      // the notification payload — latest_comment_url can point to a stale bot
+      // comment even when a human triggered the notification (e.g., by editing
+      // the issue body). Therefore, we do NOT attempt to infer the actor and
+      // leave it null, treating all mention/team_mention events as human-triggered.
+    } catch (err) {
+      log.warn(
+        `Could not determine actor for ${n.reason} on ${where}; proceeding as human-triggered to be safe.`,
+        err,
+      );
+    }
+
+    if (actorLogin === this.login) {
+      log.debug(`Skipping self-triggered ${n.reason} on ${where}.`);
+      this.handled.add(key);
+      try {
+        await this.client.markThreadRead(n.id);
+      } catch (err) {
+        log.warn(`Could not mark self-triggered thread read on ${n.repository.full_name}; retrying next poll.`, err);
+      }
+      return;
+    }
+
     try {
       // Mentions and assignments are both work orders: a human assigning the
       // bot to an issue means "put the agent on this". The assignment stays
