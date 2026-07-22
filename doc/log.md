@@ -6,6 +6,13 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-22** — Fiks: PR #55 glemte volumlinja for junior-agentens
+  `triggers/` i `integrations/docker-compose.yml`, så integrations krasjet
+  ved oppstart med `EACCES: mkdir /agents/local-cc-jr-developer` (køen
+  prøvde å opprette rutekatalogen i containerens rot-eide `/agents`).
+  Én mount-linje per rute i `AGENT_ROUTES` er kontrakten — nå dokumentert
+  av feilen også.
+
 - **2026-07-22** — Junior-kodeagent (issue #53): ny agent
   `local-cc-jr-developer` — Claude Code CLI mot lokal modell via LM Studios
   Anthropic-kompatible API (`scripts/junior-agent.ps1` setter env og starter

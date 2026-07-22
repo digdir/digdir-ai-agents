@@ -18,6 +18,7 @@ services:
       # aldri hele agents/-treet, som ville eksponert agentenes .env-filer.
       # Legg til én linje per rute: ../agents/<navn>/triggers:/agents/<navn>/triggers
       - ../agents/local-cc-coding-agent/triggers:/agents/local-cc-coding-agent/triggers
+      - ../agents/local-cc-jr-developer/triggers:/agents/local-cc-jr-developer/triggers
       # Egen state (pending replies + results-offset) overlever restart
       - integrations-state:/state
     # Overstyrbar for utvikling i forgrunnen (scripts/dev.ps1 setter "no");
