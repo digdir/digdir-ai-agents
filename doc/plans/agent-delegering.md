@@ -84,6 +84,16 @@ resultatet er alltid en PR et menneske reviewer.
 - Verifiseres autonomt: Slack-melding → analyse → issue → delegering →
   kodeagenten lager PR → svar i tråden.
 
+### Læringsløkke for delegering (issue #43) ✅
+- Broen sender et `delegation-outcome`-event til opphavsagenten når det
+  delegerte svaret er levert (`AGENT_DELEGATION_DEBRIEF`, default på).
+  Debrief-eventet har ingen pending svar-rute (resultatet konsumeres stille)
+  og teller ikke som delegeringshopp — kan aldri starte en loop.
+- Proxy-agenten reflekterer ved debrief (knowledge-base-skillen) og skriver
+  0–2 prosess-læringer (`scope: "process"`, `source: "agent"`) til
+  kunnskapsrepoets innboks; kodeagenten har et retro-steg som avleverer
+  tilsvarende læringer før resultatlinja skrives.
+
 ### M4 — Containerisert kodeagent
 - `agents/<code-agent>/` i Docker med skrivbar `workspaces_repos`-mount og
   eget fine-grained token (Contents R/W på avgrensede repoer — tredje

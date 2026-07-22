@@ -16,6 +16,9 @@ const log = createLogger("queue");
  *   - A result with `intent: "delegate"` is routed onwards: the task becomes a
  *     new event in the target agent's inbox, and the pending reply is remapped
  *     so the final answer still lands in the originating thread/issue.
+ *   - Once a delegated answer has been delivered, the delegating agent gets a
+ *     `delegation-outcome` debrief event ({@link sendDebrief}) so it can
+ *     reflect on the process. The debrief has no pending reply route.
  */
 export class AgentQueue {
   private readonly config: AgentQueueConfig;
@@ -169,6 +172,7 @@ export class AgentQueue {
 
     this.pending.delete(result.id);
     await this.persistPending();
+    await this.sendDebrief(agent, result, reply, delivery);
   }
 
   /**
@@ -221,7 +225,7 @@ export class AgentQueue {
     await fs.appendFile(target!.inboxFile, JSON.stringify(event) + "\n", "utf8");
 
     this.pending.delete(result.id);
-    this.pending.set(newId, { ...reply, hops });
+    this.pending.set(newId, { ...reply, hops, origin: { agent: from.name, eventId: result.id } });
     await this.persistPending();
     log.info(`Delegated "${result.id}" from "${from.name}" to "${target!.name}" as "${newId}".`);
 
@@ -230,6 +234,49 @@ export class AgentQueue {
     await this.post(reply, { kind: "message", text: truncate(text, this.config.maxReplyChars) }, posters, newId, {
       keepWorking: true,
     });
+  }
+
+  /**
+   * Debriefs the delegating agent after a delegated answer has been delivered:
+   * appends a `delegation-outcome` event to its inbox so it can reflect on the
+   * process. The event deliberately gets no pending reply route — the agent's
+   * result on it is consumed without posting anything to Slack/GitHub, and
+   * (for the same reason) it can never start a new delegation, so no hop is
+   * spent. Best effort: a failed append is logged and dropped, never retried.
+   */
+  private async sendDebrief(from: AgentRoute, result: ResultLine, reply: ReplyContext, delivery: Delivery): Promise<void> {
+    const origin = reply.origin;
+    if (!this.config.delegationDebrief || !origin) return;
+    const originAgent = this.agents.find((a) => a.name === origin.agent);
+    if (!originAgent) {
+      log.warn(`No agent "${origin.agent}" configured for the debrief of "${result.id}" — skipping.`);
+      return;
+    }
+    // Use the actual delivered text (which may include error-wrapped or fallback text).
+    const deliveredText = delivery.kind === "message" ? delivery.text : (result.reply ?? "").trim();
+    const summary = truncate(deliveredText, 2000);
+    const event: QueueEvent = {
+      id: `${origin.eventId}-outcome`.replace(/[^a-zA-Z0-9._-]/g, "_"),
+      source: "agent",
+      type: "delegation-outcome",
+      received_at: new Date().toISOString(),
+      prompt:
+        `Debrief: oppgaven du delegerte til «${from.name}» (ditt event «${origin.eventId}») er ` +
+        `levert til brukeren med status «${result.status}». Svaret var: «${summary}». ` +
+        `Reflekter kort over delegeringsprosessen og svar med intent "ack" — svaret ditt postes ikke videre.`,
+      payload: {
+        delegated_to: from.name,
+        status: result.status,
+        reply: truncate(deliveredText, this.config.maxReplyChars),
+        origin_event_id: origin.eventId,
+      },
+    };
+    try {
+      await fs.appendFile(originAgent.inboxFile, JSON.stringify(event) + "\n", "utf8");
+      log.info(`Debriefed "${originAgent.name}" about "${result.id}" (delegation-outcome "${event.id}").`);
+    } catch (err) {
+      log.warn(`Could not append delegation-outcome for "${result.id}" to "${originAgent.name}".`, err);
+    }
   }
 
   /**
