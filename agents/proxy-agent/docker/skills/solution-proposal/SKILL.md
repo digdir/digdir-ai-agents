@@ -53,12 +53,29 @@ ende-til-ende, fra opprettelse til det lukkes av kodeagentens PR:
 gh issue edit <nr> --repo <owner>/<repo> --add-assignee @me
 ```
 
-## 3. Deleger
+## 3. Velg utførende agent
+
+Finnes flere kodeagenter i `DELEGATE_AGENTS`, vurder kort hvem som skal
+utføre — velg **junior-agenten** (`local-cc-jr-developer`) når *alle* disse
+stemmer:
+
+- Oppgaven er **godt definert og avgrenset**: få filer, kjent mønster,
+  entydige akseptansekriterier — lite rom for tolkning.
+- **Lav risiko**: ingen arkitekturvalg, ikke sikkerhets- eller
+  tilgangsrelatert, lett å reviewe og reversere.
+
+Velg **senior-agenten** (`local-cc-coding-agent`) når noe av dette gjelder:
+oppgaven er kompleks eller uklar, krever arkitektur- eller designvalg, berører
+sikkerhet/tilganger/hemmeligheter, spenner over mange filer eller
+komponenter, eller tidligere forsøk har feilet. Er du i tvil — velg senior.
+Finnes bare én kodeagent i `DELEGATE_AGENTS`, bruk den.
+
+## 4. Deleger
 
 Avslutt med `===AGENT-RESULT===`-blokken med `intent: "delegate"`:
 
 ```json
-{"intent":"delegate","reply":"<kort til brukeren: hva du foreslår, lenke til issuet, og at kodeagenten tar utførelsen>","delegate":{"agent":"local-cc-coding-agent","prompt":"<komplett, selvstendig oppgavebeskrivelse>","payload":{"issue":"<issue-URL>","repo":"<owner>/<repo>"}}}
+{"intent":"delegate","reply":"<kort til brukeren: hva du foreslår, lenke til issuet, og at kodeagenten tar utførelsen>","delegate":{"agent":"<valgt agent, f.eks. local-cc-coding-agent>","prompt":"<komplett, selvstendig oppgavebeskrivelse>","payload":{"issue":"<issue-URL>","repo":"<owner>/<repo>"}}}
 ```
 
 Krav til `delegate.prompt` — kodeagenten ser **ikke** tråden din, så

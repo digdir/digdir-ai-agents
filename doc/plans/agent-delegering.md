@@ -94,6 +94,19 @@ resultatet er alltid en PR et menneske reviewer.
   kunnskapsrepoets innboks; kodeagenten har et retro-steg som avleverer
   tilsvarende læringer før resultatlinja skrives.
 
+### Junior-kodeagent: local-cc-jr-developer (issue #53) ✅
+- `agents/local-cc-jr-developer/`: samme runtime (Claude Code CLI,
+  interaktivt) og samme filkontrakt som local-cc-coding-agent, men mot en
+  lokal kodemodell via LM Studios Anthropic-kompatible `/v1/messages`-API —
+  bare env-variabler (`ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`/
+  `ANTHROPIC_MODEL`), ingen proxy. Oppstart er én kommando:
+  `scripts/junior-agent.ps1`.
+- Instruksen krever eksplisitt «meld tilbake i stedet for å gjette» ved
+  uklare eller for store oppgaver, og solution-proposal-skillen fikk
+  valgkriterier: godt definert/avgrenset/lav risiko → junior; komplekst/
+  uklart/arkitektur/sikkerhet → senior (local-cc-coding-agent).
+- Mellomsteg på veien mot M4; M4 står ved lag som fremtidig mål.
+
 ### M4 — Containerisert kodeagent
 - `agents/<code-agent>/` i Docker med skrivbar `workspaces_repos`-mount og
   eget fine-grained token (Contents R/W på avgrensede repoer — tredje
