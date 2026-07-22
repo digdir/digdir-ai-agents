@@ -127,6 +127,21 @@ function Restore-Previous {
   }
 }
 
+function Test-KeyPressed {
+  <#
+    .SYNOPSIS
+      Non-blocking sjekk om en tast er trykket. Returnerer tasten eller $null.
+    .DESCRIPTION
+      Brukes i watch-modus for å fange R-tasten uten å blokkere løkken.
+      Tasten fjernes fra bufferen umiddelbart (argumentet $true).
+  #>
+  if ([Console]::KeyAvailable) {
+    $key = [Console]::ReadKey($true).Key.ToString().ToUpper()
+    return $key
+  }
+  return $null
+}
+
 function Invoke-UpdatePass {
   Push-Location $repoRoot
   try {
@@ -195,8 +210,23 @@ function Invoke-UpdatePass {
 }
 
 if ($WatchSeconds -gt 0) {
-  Write-Step "Watch-modus: sjekker origin/$Branch hvert ${WatchSeconds}. sekund (Ctrl+C stopper)."
+  Write-Step "Watch-modus: sjekker origin/$Branch hvert ${WatchSeconds}. sekund (Ctrl+C stopper). Trykk R for å reload .env-config."
   while ($true) {
+    $key = Test-KeyPressed
+    if ($key -eq 'R') {
+      Write-Step "Reload av .env-config trigget — starter klyngen på nytt..."
+      try {
+        docker compose up -d
+        if ($LASTEXITCODE -eq 0) {
+          Write-Step ".env-config reloadet."
+        } else {
+          Write-Warning "docker compose up -d feilet — se docker compose logs."
+        }
+      } catch {
+        Write-Warning "Feil under reload: $_"
+      }
+      continue
+    }
     try { Invoke-UpdatePass } catch { Write-Warning $_.Exception.Message }
     Start-Sleep -Seconds $WatchSeconds
   }
