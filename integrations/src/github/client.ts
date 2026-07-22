@@ -178,7 +178,9 @@ export class GithubClient {
       actor: { login: string };
     }>;
 
-    const lastAssignEvent = events.find((e) => e.event === "assigned" && e.assignee?.login === botLogin);
+    const lastAssignEvent = events.findLast(
+      (e) => e.event === "assigned" && e.assignee?.login === botLogin,
+    );
     return lastAssignEvent?.actor.login ?? null;
   }
 

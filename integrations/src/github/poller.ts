@@ -124,8 +124,12 @@ export class GithubPoller {
           );
         }
       } else {
-        // For mentions/team_mentions, check the author of the triggering comment or issue body.
-        const sourceUrl = n.subject.latest_comment_url ?? n.subject.url;
+        // For mentions/team_mentions, check the author of the triggering comment
+        // or issue body. Only attempt self-assign filtering when we have a
+        // comment URL — without it, falling back to the issue/PR creator would
+        // incorrectly filter out valid human-triggered mentions in the issue body
+        // when the bot itself created the issue/PR.
+        const sourceUrl = n.subject.latest_comment_url;
         if (sourceUrl) {
           actorLogin = await this.client.getResourceAuthor(sourceUrl);
         }
