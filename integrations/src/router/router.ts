@@ -134,7 +134,7 @@ function activityFor(event: QueueEvent, text: string): Omit<Activity, "embedding
   if (event.source === "github") {
     const repo = typeof p.repo === "string" ? p.repo : "";
     const issue = typeof p.issue === "number" ? p.issue : typeof p.issue === "string" ? Number(p.issue) : NaN;
-    if (!repo || !Number.isFinite(issue)) return null;
+    if (!repo || !Number.isSafeInteger(issue) || issue <= 0) return null;
     return { key: `github:${repo}#${issue}`, kind: "github-issue", ref: { repo, issue }, text: indexedText };
   }
   // source "agent" (delegations, debriefs) is internal traffic — not routed.

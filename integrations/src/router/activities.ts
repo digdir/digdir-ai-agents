@@ -97,7 +97,7 @@ export class ActivityIndex {
   /** Writes via a temp file + rename, chained so writes never overlap. */
   private persist(): Promise<void> {
     const content = JSON.stringify([...this.entries.values()]);
-    this.writeChain = this.writeChain.then(async () => {
+    this.writeChain = this.writeChain.catch(() => {}).then(async () => {
       const tmp = `${this.file}.tmp`;
       await fs.writeFile(tmp, content, "utf8");
       await fs.rename(tmp, this.file);
