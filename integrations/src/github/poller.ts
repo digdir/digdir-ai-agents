@@ -123,16 +123,12 @@ export class GithubPoller {
             this.login,
           );
         }
-      } else {
-        // For mentions/team_mentions, check the author of the triggering comment.
-        // Only filter when we have a comment URL — falling back to the issue/PR
-        // creator would incorrectly drop valid human-triggered mentions in the
-        // issue body when the bot itself created the issue/PR.
-        const sourceUrl = n.subject.latest_comment_url;
-        if (sourceUrl) {
-          actorLogin = await this.client.getResourceAuthor(sourceUrl);
-        }
       }
+      // For mentions/team_mentions, the actor is not reliably attributable from
+      // the notification payload — latest_comment_url can point to a stale bot
+      // comment even when a human triggered the notification (e.g., by editing
+      // the issue body). Therefore, we do NOT attempt to infer the actor and
+      // leave it null, treating all mention/team_mention events as human-triggered.
     } catch (err) {
       log.warn(
         `Could not determine actor for ${n.reason} on ${where}; proceeding as human-triggered to be safe.`,
