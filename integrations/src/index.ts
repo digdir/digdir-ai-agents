@@ -33,6 +33,11 @@ async function main(): Promise<void> {
   const github = config.github.enabled ? new GithubPoller(config.github, queue, awaitReply) : null;
   const slack = config.slack.enabled ? new SlackConnector(config.slack, queue, awaitReply) : null;
 
+  // Wire connectors into the queue so submit() can short-circuit acks directly.
+  if (queue && github && slack) {
+    queue.setConnectors({ slack, github });
+  }
+
   const shutdown = (signal: string) => {
     log.info(`Received ${signal}, shutting down…`);
     abort.abort();

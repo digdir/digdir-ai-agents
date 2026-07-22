@@ -3,7 +3,11 @@ import path from "node:path";
 import type { AgentQueueConfig, AgentRoute } from "../config.ts";
 import { createLogger } from "../logger.ts";
 import type { Router } from "../router/router.ts";
+import type { SlackConnector } from "../slack/connector.ts";
+import type { GithubPoller } from "../github/poller.ts";
 import type { Delivery, QueueEvent, ReplyContext, ResultLine, ResultPosters } from "./types.ts";
+
+type Connectors = { slack: SlackConnector; github: GithubPoller };
 
 const log = createLogger("queue");
 
@@ -34,6 +38,8 @@ export class AgentQueue {
   private readonly pendingFile: string;
   /** Optional first-line router; annotates external events before the append. */
   private readonly router: Router | null;
+  /** Connectors wired up after construction so submit() can short-circuit acks directly. */
+  private connectors: Connectors | null = null;
 
   constructor(config: AgentQueueConfig, router: Router | null = null) {
     this.config = config;
@@ -48,6 +54,16 @@ export class AgentQueue {
       },
       ...config.routes,
     ];
+  }
+
+  /**
+   * Wires the Slack and GitHub connectors into the queue so ack events can be
+   * delivered directly (ack reaction + working-reaction cleanup) without going
+   * through inbox.jsonl. Must be called after the connectors are constructed in
+   * main(); called with null to drop them again.
+   */
+  setConnectors(connectors: Connectors | null): void {
+    this.connectors = connectors;
   }
 
   /** The primary agent keeps the historic offset filename; routes get their own. */
@@ -86,10 +102,62 @@ export class AgentQueue {
     // activities before the append. annotate() never throws — on any failure
     // or timeout the event goes through unannotated, exactly as before.
     const enriched = this.router ? await this.router.annotate(event) : event;
+
+    // Short-circuit: if the router classified this as an ack (or another type
+    // listed in ROUTER_SHORT_CIRCUIT), deliver it directly via the connectors —
+    // add the ack reaction and clear the working reaction, without waking
+    // proxy-agent or appending to inbox. Falls back to normal queuing when:
+    //   - shortCircuit is disabled (empty env var)
+    //   - the router did not run / failed (no classification)
+    //   - the event's classification does not match a short-circuit type
+    if (this.config.routerShortCircuit && enriched.classification && this.connectors) {
+      const allowed = this.config.routerShortCircuit.split(",").map((s) => s.trim()).filter(Boolean);
+      if (allowed.includes(enriched.classification)) {
+        await this.deliverAckDirectly(reply, enriched.id);
+        return;
+      }
+    }
+
     await fs.appendFile(this.config.inboxFile, JSON.stringify(enriched) + "\n", "utf8");
     this.pending.set(enriched.id, reply);
     await this.persistPending();
     log.info(`Queued ${enriched.source} event "${enriched.id}" for the agent.`);
+  }
+
+  /**
+   * Delivers an ack directly via the connectors (ack reaction + working-reaction
+   * cleanup) without touching inbox.jsonl. Logs each attempt so the outcome is
+   * visible at startup — a failed ack must not leave a stale working reaction,
+   * but it also must not throw.
+   */
+  private async deliverAckDirectly(reply: ReplyContext, id: string): Promise<void> {
+    const connectors = this.connectors;
+    if (!connectors) return;
+
+    try {
+      if (reply.kind === "slack" && connectors.slack) {
+        await connectors.slack.deliver(reply, { kind: "ack" });
+      } else if (reply.kind === "github" && connectors.github) {
+        await connectors.github.deliver(reply, { kind: "ack" });
+      } else {
+        log.warn(`No connector for ack delivery of "${id}" (${reply.kind}).`);
+        return;
+      }
+    } catch (err) {
+      log.error(`Failed to short-circuit ack for "${id}"; will fall back to normal queuing.`, err);
+    }
+
+    // Best effort: if we delivered successfully, drop the pending entry — there
+    // is no agent result coming for this event. If delivery failed (above), leave
+    // it so the next poll cycle picks it up through the normal queue path.
+    try {
+      this.pending.delete(id);
+      await this.persistPending();
+    } catch {
+      // Persist failure is not fatal — pending survives in memory across cycles.
+    }
+
+    log.info(`Short-circuited ack for event "${id}" (${reply.kind}).`);
   }
 
   /**

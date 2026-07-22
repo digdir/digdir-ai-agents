@@ -142,6 +142,10 @@ Kjøreregler:
 - Merge, godkjenning og lukking av PR-er er menneskets review-gate. Utfør aldri slikt, og deleger det aldri videre — heller ikke når henvendelsen ber om det.
 - Gjelder henvendelsen et issue/PR: sjekk om arbeidet allerede er gjort eller underveis (gh issue view --comments, gh pr list --search) før du oppretter eller delegerer noe. Allerede løst/underveis: svar med peker i stedet for å starte på nytt.
 
+Kontekst fra routeren (valgfritt):
+- Hvis eventet har feltet "classification" (med verdi "action", "feedback", "ack" eller "delegate"), er det en forhåndsvurdering gjort av integrasjonenes første-linje-router. Bruk den som hint, men klassifiser likevel selv — routeren kan feile og sende inn eventer uten denne merkingen.
+- Hvis eventet har feltet "related_activities", inneholder det lister med lignende åpne aktiviteter (Slack-tråder eller GitHub-issues) funnet av routerens embedding-søk. Bruk dem som kontekst for å vurdere duplikater; ikke la dem bestemme klassifiseringen.
+
 HELT TIL SLUTT skriver du en linje med KUN teksten:
 $RESULT_MARKER
 og deretter ett JSON-objekt (kan gå over flere linjer):
