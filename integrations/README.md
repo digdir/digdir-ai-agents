@@ -93,6 +93,35 @@ same machine).
   Slack/GitHub — and it does not count as a delegation hop, so it can never
   start a delegation loop.
 
+**First-line router** (optional — `ROUTER_BASE_URL`):
+- Before an external event is appended to the agent's inbox, a small local
+  model annotates it — routing/classification is one structured LLM call, not
+  agentic work, so it lives here in integrations, which is the only component
+  that sees the whole event stream from both channels:
+  - **`classification`** — `action` / `feedback` / `ack` / `delegate`, from
+    one chat call with structured output (`ROUTER_MODEL`).
+  - **`related_activities`** — references (never text) to similar open
+    activities: every Slack thread / GitHub issue the bot has seen becomes an
+    entry in a small embedding index (`ROUTER_EMBEDDING_MODEL`, embedding of
+    the title/first message), and new events are matched against it with
+    cosine similarity (`ROUTER_MATCH_THRESHOLD`, top `ROUTER_MAX_RELATED`).
+    Lets the agent spot "this is the same topic as issue #42" across
+    channels instead of creating duplicates. The index is persisted in
+    `AGENT_STATE_DIR` (the `integrations-state` volume in Docker), so it
+    survives restarts.
+- The router **only annotates**. It never drops or reroutes an event, and the
+  first milestone does not change who receives it — the agent decides what
+  the annotations mean. Delegation/debrief events (`source: "agent"`) are
+  internal traffic and are not routed.
+- **Failure = fallback, never blockage**: endpoint down, timeout
+  (`ROUTER_TIMEOUT_MS`) or invalid model output logs a warning and queues the
+  event unannotated. Model output is validated against a fixed schema before
+  it is allowed onto the event — the event text is untrusted input, and the
+  router's output is treated as data, not instructions. The router holds no
+  tokens and has no tools.
+- Empty `ROUTER_BASE_URL` (the default) disables all of this; events are
+  queued exactly as before.
+
 ## Requirements
 
 - **Node ≥ 23** (runs the TypeScript directly via type stripping — no build step),

@@ -15,6 +15,24 @@ export interface QueueEvent {
   received_at: string;
   prompt: string;
   payload: Record<string, unknown>;
+  /**
+   * First-line router annotations (optional — absent when the router is off
+   * or failed). The router only annotates; it never drops or reroutes events.
+   */
+  classification?: "action" | "feedback" | "ack" | "delegate";
+  related_activities?: RelatedActivity[];
+}
+
+/**
+ * An open activity (Slack thread / GitHub issue) the router found similar to
+ * the event. References only — never the activity's text.
+ */
+export interface RelatedActivity {
+  kind: "slack-thread" | "github-issue";
+  key: string;
+  ref: Record<string, unknown>;
+  /** Cosine similarity [0..1] against the activity's title/first message. */
+  score: number;
 }
 
 /**
