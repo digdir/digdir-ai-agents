@@ -20,6 +20,8 @@ kronologisk endringslogg.
   læringsloop)
 - [plans/agent-delegering.md](plans/agent-delegering.md) — delegering mellom
   agenter via broen, og utførende kodeagent (local-cc-coding-agent)
+- [pr-prosess.md](pr-prosess.md) — auto-merge på trygge stier,
+  CODEOWNERS/menneske-review på sensitive (issue #54)
 
 ## Overordnet kunnskap
 
