@@ -7,7 +7,7 @@ import type { SlackConnector } from "../slack/connector.ts";
 import type { GithubPoller } from "../github/poller.ts";
 import type { Delivery, QueueEvent, ReplyContext, ResultLine, ResultPosters } from "./types.ts";
 
-type Connectors = { slack: SlackConnector; github: GithubPoller };
+type Connectors = { slack?: SlackConnector; github?: GithubPoller };
 
 const log = createLogger("queue");
 
@@ -103,19 +103,17 @@ export class AgentQueue {
     // or timeout the event goes through unannotated, exactly as before.
     const enriched = this.router ? await this.router.annotate(event) : event;
 
-    // Short-circuit: if the router classified this as an ack (or another type
-    // listed in ROUTER_SHORT_CIRCUIT), deliver it directly via the connectors —
-    // add the ack reaction and clear the working reaction, without waking
-    // proxy-agent or appending to inbox. Falls back to normal queuing when:
+    // Short-circuit: if the router classified this as an ack, deliver it
+    // directly via the connectors — add the ack reaction and clear the working
+    // reaction, without waking proxy-agent or appending to inbox. Falls back to
+    // normal queuing when:
     //   - shortCircuit is disabled (empty env var)
     //   - the router did not run / failed (no classification)
-    //   - the event's classification does not match a short-circuit type
-    if (this.config.routerShortCircuit && enriched.classification && this.connectors) {
-      const allowed = this.config.routerShortCircuit.split(",").map((s) => s.trim()).filter(Boolean);
-      if (allowed.includes(enriched.classification)) {
-        await this.deliverAckDirectly(reply, enriched.id);
-        return;
-      }
+    //   - the event's classification is not exactly "ack"
+    if (this.config.routerShortCircuit && enriched.classification === "ack" && this.connectors) {
+      const delivered = await this.deliverAckDirectly(reply, enriched.id);
+      if (delivered) return;
+      // Failed delivery: continue to normal queue path below.
     }
 
     await fs.appendFile(this.config.inboxFile, JSON.stringify(enriched) + "\n", "utf8");
@@ -126,13 +124,13 @@ export class AgentQueue {
 
   /**
    * Delivers an ack directly via the connectors (ack reaction + working-reaction
-   * cleanup) without touching inbox.jsonl. Logs each attempt so the outcome is
-   * visible at startup — a failed ack must not leave a stale working reaction,
-   * but it also must not throw.
+   * cleanup) without touching inbox.jsonl. Returns true on success, false on
+   * failure (so the caller can fall back to normal queuing). Logs each attempt
+   * so the outcome is visible.
    */
-  private async deliverAckDirectly(reply: ReplyContext, id: string): Promise<void> {
+  private async deliverAckDirectly(reply: ReplyContext, id: string): Promise<boolean> {
     const connectors = this.connectors;
-    if (!connectors) return;
+    if (!connectors) return false;
 
     try {
       if (reply.kind === "slack" && connectors.slack) {
@@ -141,15 +139,16 @@ export class AgentQueue {
         await connectors.github.deliver(reply, { kind: "ack" });
       } else {
         log.warn(`No connector for ack delivery of "${id}" (${reply.kind}).`);
-        return;
+        return false;
       }
     } catch (err) {
       log.error(`Failed to short-circuit ack for "${id}"; will fall back to normal queuing.`, err);
+      return false;
     }
 
     // Best effort: if we delivered successfully, drop the pending entry — there
-    // is no agent result coming for this event. If delivery failed (above), leave
-    // it so the next poll cycle picks it up through the normal queue path.
+    // is no agent result coming for this event. If delivery failed (above), we
+    // returned false and the caller will append to inbox.jsonl.
     try {
       this.pending.delete(id);
       await this.persistPending();
@@ -158,6 +157,7 @@ export class AgentQueue {
     }
 
     log.info(`Short-circuited ack for event "${id}" (${reply.kind}).`);
+    return true;
   }
 
   /**

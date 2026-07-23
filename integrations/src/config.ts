@@ -73,11 +73,12 @@ export interface AgentQueueConfig {
   /** Upper bound on a posted reply's length; longer output is truncated. */
   maxReplyChars: number;
   /**
-   * Short-circuit event types that the connector should deliver directly (add
-   * ack reaction, clear working reaction) without queuing in the agent's
-   * inbox — events classified with one of these values bypass the queue and
-   * never wake proxy-agent. Empty = short-circuit disabled; comma-separated
-   * list allowed, e.g. "ack". Default: "ack".
+   * Short-circuit for ack-classified events: when set to "ack", the connector
+   * delivers ack-classified events directly (add ack reaction, clear working
+   * reaction) without queuing in the agent's inbox — acks bypass the queue and
+   * never wake proxy-agent. Empty = short-circuit disabled. Only "ack" or empty
+   * string is accepted; other values are normalized to empty (disabled).
+   * Default: "ack".
    */
   routerShortCircuit: string;
 }
@@ -191,7 +192,10 @@ export function loadConfig(): Config {
     resultsPollIntervalSeconds: Number(process.env.AGENT_RESULTS_POLL_INTERVAL ?? "5"),
     postResults: bool(process.env.AGENT_POST_RESULTS, true),
     maxReplyChars: Number(process.env.AGENT_MAX_REPLY_CHARS ?? "12000"),
-    routerShortCircuit: (process.env.ROUTER_SHORT_CIRCUIT ?? "ack").trim(),
+    routerShortCircuit: (() => {
+      const raw = (process.env.ROUTER_SHORT_CIRCUIT ?? "ack").trim();
+      return raw === "" || raw === "ack" ? raw : "";
+    })(),
   };
 
   if (agentQueue.enabled) {

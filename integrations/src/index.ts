@@ -34,8 +34,8 @@ async function main(): Promise<void> {
   const slack = config.slack.enabled ? new SlackConnector(config.slack, queue, awaitReply) : null;
 
   // Wire connectors into the queue so submit() can short-circuit acks directly.
-  if (queue && github && slack) {
-    queue.setConnectors({ slack, github });
+  if (queue && (github || slack)) {
+    queue.setConnectors({ slack: slack ?? undefined, github: github ?? undefined });
   }
 
   const shutdown = (signal: string) => {
