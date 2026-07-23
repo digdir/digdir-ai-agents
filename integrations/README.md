@@ -144,6 +144,15 @@ same machine).
 - Empty `ROUTER_BASE_URL` (the default) disables all of this; events are
   queued exactly as before.
 
+- **Short-circuit** (`ROUTER_SHORT_CIRCUIT`, default `"ack"`): when the router
+  classifies an event as `"ack"`, integrations delivers it directly through the
+  connector (adds ack reaction, clears working reaction) and skips appending to
+  `inbox.jsonl` — proxy-agent never wakes. Empty env var disables short-circuit;
+  only `"ack"` or empty is accepted (other values are normalized to empty). This
+  is purely an optimization: if a classified event still gets queued (router
+  failed / no classification), the agent's own classification step will still
+  see it and act accordingly.
+
 ## Requirements
 
 - **Node ≥ 23** (runs the TypeScript directly via type stripping — no build step),
