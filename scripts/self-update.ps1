@@ -257,7 +257,13 @@ if ($WatchSeconds -gt 0) {
     try { Invoke-UpdatePass } catch { Write-Warning $_.Exception.Message }
     switch (Wait-WithHotkeys $WatchSeconds) {
       "reload" { try { Invoke-EnvReload } catch { Write-Warning $_.Exception.Message } }
-      "quit"   { Write-Step "Avslutter watch-modus."; $quit = $true }
+      "quit"   {
+        Write-Step "Stopper klyngen (docker compose down)..."
+        docker compose down 2>$null
+        if ($LASTEXITCODE -ne 0) { Write-Warning "docker compose down feilet — sjekk at Docker er tilgjengelig." }
+        Write-Step "Avslutter watch-modus."
+        $quit = $true
+      }
     }
   }
 } else {
