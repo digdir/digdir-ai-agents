@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/index.ts",
     "start:bun": "bun run src/index.ts",
+    "test": "node --test --disable-warning=ExperimentalWarning src/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

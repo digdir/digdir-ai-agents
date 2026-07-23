@@ -17,6 +17,63 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
   Contents-tilgang). Minimal CI (`ci.yml`, typecheck i integrations) som
   required check. Se [pr-prosess.md](pr-prosess.md).
 
+- **2026-07-22** — Sikkerhet: hard allowlist for GitHub-initierte
+  agent-aksjoner (issue #70): kun logins i `GITHUB_ALLOWED_USERS` kan utløse
+  arbeidsordrer fra GitHub. Aktøren slås opp per notifikasjon før alt annet
+  (assign → siste `assigned`-event; mention → forfatteren av innholdet som
+  blir prompten). Ikke på lista: WARN-logg med aktør/repo/issue/reason, tråd
+  markert lest, ingen reaksjon/kø/router-kall. Fail-closed: tom liste (med
+  oppstartsadvarsel) eller feilet aktør-oppslag dropper eventet. Botens egne
+  hendelser skippes fortsatt stille på debug-nivå (#63). Restrisiko
+  (innholds-injection via godkjente brukere) dokumentert i
+  integrations/README.
+
+- **2026-07-22** — Læringsrunde etter dagens hendelser: agent-promptene er
+  strammet opp mot fire observerte feilmønstre. (1) Proxyen forsøkte å kode
+  selv på detaljerte issue-tekster (PR #73/#75) — entrypoint-prompten og
+  solution-proposal sier nå eksplisitt at en komplett spesifikasjon er en
+  bestilling å delegere. (2) Falske «jeg har fikset det»-kommentarer
+  (#61/#63) — ærlighetsregel i entrypoint, github-issues-prs og
+  kodeagentenes resultatkontrakt: påstå kun det som er verifisert gjort i
+  kjøringen. (3) PR-er mot `main` i stedet for `v2.0` — base-branch skal
+  navngis eksplisitt i delegeringsprompter og `gh pr create --base` er
+  obligatorisk; kryssrepo krever fullt kvalifisert `Closes owner/repo#nr`.
+  (4) Duplisert/blandet arbeid (#60 delegert tre ganger, PR #78 blandet
+  scope) — duplikatsjekk før issue/delegering/koding, én oppgave per PR,
+  branch opprettes fra `origin/<base>` før filer røres. I tillegg:
+  bot-statusmeldinger (à la CodeRabbits «jeg er i gang») klassifiseres som
+  ack, og merge/godkjenning delegeres aldri — det er menneskets
+  review-gate. Kildene er KB-innboksens prosess-læringer fra 21.–22. juli.
+
+- **2026-07-22** — Drift: watch-modusen i `scripts/self-update.ps1` fikk
+  hurtigtaster (issue #72): `R` gjenskaper containere med oppdatert
+  `.env`-config (`docker compose up -d` + eksisterende helsesjekk — env_file
+  leses kun ved recreate, så restart holder ikke), `Q` avslutter ryddig.
+  Uendret config = ingen recreate og ingen helsesjekk-venting. Uten
+  interaktiv konsoll (redirigert stdin/tjeneste) degraderer ventingen til
+  ren sleep som før. Reload rører hverken images, git eller
+  `:rollback`-taggene.
+
+- **2026-07-22** — GitHub-polleren ignorerer selvutløste hendelser (issue
+  #63): før et event køes sjekkes aktøren bak notifikasjonen — for assigns
+  siste `assigned`-event fra issue-events-API-et (`getLastAssigner`). Kun
+  assignment-hendelser self-filteres når aktøren er pålitelig attribuerbar;
+  mention/team_mention-hendelser behandles alltid som menneskeutløst siden
+  aktøren ikke kan utledes pålitelig fra notifikasjonens `latest_comment_url`
+  (kan peke på eldre bot-kommentar selv om en bruker trigget hendelsen). Er
+  aktøren botens egen login markeres tråden som lest uten agent-event
+  (debug-logges). Feiler oppslaget behandles hendelsen som menneskeutløst —
+  arbeidsordrer droppes aldri stille. Stopper selvloopen opprett issue →
+  self-assign → notifikasjon → behandle eget issue.
+
+- **2026-07-22** — Slack-reaksjoner filtreres (issue #61): `onReaction` i
+  `SlackConnector` håndterer nå kun reaksjoner på botens egne meldinger eller
+  i tråder boten deltar i — før la den working-reaksjon på alt i alle kanaler
+  den var medlem av. Teksthentingen for reaksjons-eventer bruker
+  `conversations.replies` i stedet for `conversations.history`, som ikke ser
+  trådsvar («fant ikke meldingsteksten»); samme kall gir tråddeltakelsen, og
+  filteret evalueres før noen reaksjon legges på.
+
 - **2026-07-22** — Førstelinje-router i integrations (issue #52): innkommende
   events annoteres med `classification` (action/feedback/ack/delegate — ett
   strukturert kall mot en liten lokal modell) og `related_activities`

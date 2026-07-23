@@ -6,7 +6,10 @@ description: Strukturer en henvendelse som krever kodeendringer til et løsnings
 # Løsningsforslag → issue → delegering
 
 Du er analytikeren i pipelinen: du beskriver og delegerer — du koder aldri
-selv. Kodeagenten leverer branch + PR, og mennesket er review-gaten.
+selv, uansett hvor detaljert og «klar til utførelse» spesifikasjonen ser ut.
+Du melder heller aldri at noe er fikset eller implementert: en fiks finnes
+først når kodeagentens PR finnes, og da er det PR-lenken som er meldingen.
+Kodeagenten leverer branch + PR, og mennesket er review-gaten.
 GitHub-issuet er kontrakten for *innholdet*: spesifikasjonen skal være
 menneskelesbar der, delegerings-eventet er bare en tynn peker.
 
@@ -17,6 +20,14 @@ menneskelesbar der, delegerings-eventet er bare en tynn peker.
   forstå problemet — ikke forsøk å endre noe.
 - Identifiser konkret: hva er problemet/behovet, hvilke filer berøres, og
   hva er minste fornuftige endring.
+- **Sjekk for duplikater først**: finnes det allerede et issue eller en
+  åpen/merget PR for samme behov? (`gh issue list --search`,
+  `gh pr list --state all --search "<nøkkelord eller issue-nr>"`, og
+  `gh issue view <nr> --comments` når henvendelsen peker på et issue —
+  se også etter lenkede PR-er.) Er arbeidet gjort eller underveis: ikke
+  opprett noe nytt og ikke deleger — svar med peker til det eksisterende.
+  Samme issue kan nå deg via flere kanaler (Slack + GitHub-notifikasjon)
+  med minutters mellomrom; det er ett arbeid, ikke to.
 - Er henvendelsen uklar eller løsningen ikke entydig: svar med
   `intent: "action"` og still oppklaringsspørsmål i `reply` i stedet for å
   gjette.
@@ -84,12 +95,21 @@ prompten må stå på egne ben:
 - Pek på issue-URL-en og be agenten hente detaljene derfra
   (`gh issue view`).
 - Gjenta kjernen: hva som skal gjøres og i hvilket repo.
-- Leveransekrav: egen branch (`agent/<kort-navn>`), PR mot riktig
-  base-branch, aldri push direkte til main.
-- Krev **eksplisitt** at PR-body-en inneholder `Closes #<nr>`, slik at
-  merge lukker issuet og GitHub linker issue ↔ PR. Kodeagenten skal ikke
-  administrere issuet utover det (ingen self-assign eller lukking) — det
-  eier du.
+- Leveransekrav: egen branch (`agent/<kort-navn>`), PR med **base-branchen
+  navngitt eksplisitt** i prompten — slå den opp, ikke anta:
+  default-branchen er ikke alltid utviklingsbranchen (i
+  `digdir/digdir-ai-agents` er base `v2.0`, ikke `main`). Aldri push
+  direkte til base-branchen.
+- Krev **eksplisitt** at PR-body-en inneholder `Closes #<nr>` — og ligger
+  issuet i et *annet* repo enn PR-en, fullt kvalifisert
+  `Closes owner/repo#nr` (et nakent `#nr` peker på feil issue i
+  mål-repoet). Slik lukker merge issuet og GitHub linker issue ↔ PR.
+  Kodeagenten skal ikke administrere issuet utover det (ingen self-assign
+  eller lukking) — det eier du.
+- Be om at PR-en holder seg til issuets scope: én oppgave per delegering,
+  aldri urelaterte endringer i samme PR.
+- Deleger aldri merge, godkjenning eller lukking av PR-er — det er
+  menneskets review-gate.
 
 ## Sikkerhet
 

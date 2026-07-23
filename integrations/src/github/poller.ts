@@ -55,6 +55,13 @@ export class GithubPoller {
   async start(signal: AbortSignal): Promise<void> {
     this.login = await this.client.getAuthenticatedLogin();
     log.info(`Authenticated as ${this.login}. Polling notifications every ${this.config.pollIntervalSeconds}s (min).`);
+    if (this.config.allowedUsers.length === 0) {
+      log.warn(
+        "GITHUB_ALLOWED_USERS is empty — no GitHub user can trigger agent actions; " +
+          "every GitHub work order will be dropped (fail-closed). Set a comma-separated " +
+          "list of allowed logins to open the gate.",
+      );
+    }
     this.running = true;
 
     while (this.running && !signal.aborted) {
@@ -109,6 +116,68 @@ export class GithubPoller {
     if (!relevant) {
       log.debug(`Ignoring notification (reason=${n.reason}) on ${where}.`);
       return; // Leave unhandled reasons unread; do not mark as handled.
+    }
+
+    // Hard allowlist gate (fail-closed, issue #70): only listed humans may
+    // trigger agent actions, so the actor behind every relevant notification
+    // must be determined first. For assigns that is the actor on the last
+    // `assigned` event; for mentions/team_mentions it is the author of the
+    // exact content that would become the prompt (the triggering comment, or
+    // the issue/PR body when there is none) — the gate covers what actually
+    // gets executed. A failed lookup leaves the actor null, which drops the
+    // event below: work orders from an unverifiable actor are never queued.
+    let actorLogin: string | null = null;
+    try {
+      if (n.reason === "assign") {
+        const issueNum = issueNumberFrom(n.subject.url);
+        if (issueNum != null) {
+          actorLogin = await this.client.getLastAssigner(
+            n.repository.owner.login,
+            n.repository.name,
+            issueNum,
+            this.login,
+          );
+        }
+      } else {
+        const sourceUrl = n.subject.latest_comment_url ?? n.subject.url;
+        if (sourceUrl) {
+          actorLogin = await this.client.getResourceAuthor(sourceUrl);
+        }
+      }
+    } catch (err) {
+      log.warn(`Could not determine actor for ${n.reason} on ${where}; dropping (fail-closed).`, err);
+    }
+
+    if (actorLogin?.toLowerCase() === this.login.toLowerCase()) {
+      // The bot's own events are noise, not an attack — skip quietly.
+      log.debug(`Skipping self-triggered ${n.reason} on ${where}.`);
+      this.handled.add(key);
+      try {
+        await this.client.markThreadRead(n.id);
+      } catch (err) {
+        log.warn(`Could not mark self-triggered thread read on ${n.repository.full_name}; retrying next poll.`, err);
+      }
+      return;
+    }
+
+    const allowed =
+      actorLogin !== null && this.config.allowedUsers.includes(actorLogin.toLowerCase());
+    if (!allowed) {
+      // Security trail: WARN with actor, repo, issue and reason. No reaction,
+      // no queue, no router call — the bot must not signal that it saw the
+      // event; the thread is only marked read so it stops resurfacing.
+      const issueNum = issueNumberFrom(n.subject.url);
+      log.warn(
+        `Dropping ${n.reason} on ${n.repository.full_name}#${issueNum ?? "?"} ` +
+          `("${n.subject.title}"): actor "${actorLogin ?? "unknown"}" is not in GITHUB_ALLOWED_USERS.`,
+      );
+      this.handled.add(key);
+      try {
+        await this.client.markThreadRead(n.id);
+      } catch (err) {
+        log.warn(`Could not mark dropped thread read on ${n.repository.full_name}; retrying next poll.`, err);
+      }
+      return;
     }
 
     try {

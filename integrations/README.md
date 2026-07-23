@@ -12,6 +12,26 @@ an inbound webhook endpoint, so it can run entirely from your laptop.
   the issue is handed to the agent queue, same as a mention.
 - When the bot is **@-mentioned** in a comment or body → it reacts with 🚀
   (`rocket`, configurable) on the triggering comment (or the issue/PR itself).
+- **Hard allowlist (fail-closed):** only logins listed in
+  `GITHUB_ALLOWED_USERS` can trigger agent actions. The actor behind every
+  relevant notification is looked up before anything else — for assigns the
+  actor on the last `assigned` event (issue events API), for mentions the
+  author of the exact content that becomes the prompt (the triggering
+  comment, or the issue/PR body when there is none). Events from anyone else
+  are dropped with a WARN log (actor, repo, issue, reason) and the thread is
+  marked read — **no reaction, no queue, no router call**, so the bot never
+  signals that it saw the event. An empty/unset list drops *all* GitHub work
+  orders (a startup warning says so), and a failed actor lookup also drops
+  the event (fail-closed).
+- Self-triggered events (where the bot itself is the actor) are recognized
+  the same way and skipped quietly (debug-logged) — they are noise, not an
+  attack. The bot's own account should not be on the allowlist.
+- **Residual risk** (gated elsewhere, by design): the allowlist gates
+  *initiation*, not *content*. An allowed user can still point the agent at
+  text written by a stranger (an issue body, a linked page), and prompt
+  injection may live there. Defence in depth stays as before: delegated
+  prompts and event text are treated as untrusted data, agent tokens carry no
+  Contents access, and a human review gate covers sensitive paths.
 
 **Slack** (connects over Socket Mode — a websocket, no public URL needed):
 - On start it sets its presence to **active** (green dot); on shutdown it sets
@@ -20,8 +40,10 @@ an inbound webhook endpoint, so it can run entirely from your laptop.
   message (they are all directed at the bot).
 - In **channels, private groups, group DMs and threads** → it only reacts when
   the bot is **@-mentioned**. Other messages are ignored.
-- It also picks up **emoji reactions** on any message (`reaction_added`). When
-  the queue bridge is on, the reaction and the message it sits on are handed to
+- It also picks up **emoji reactions** (`reaction_added`) — but only on the
+  bot's **own messages** or in **threads the bot participates in**; reactions
+  elsewhere in channels it happens to be a member of are ignored. When the
+  queue bridge is on, the reaction and the message it sits on are handed to
   the agent, which interprets what the reaction means (e.g. a 👍 as positive
   feedback). The bot ignores its own reactions to avoid loops.
 

@@ -16,6 +16,11 @@ pull requests** (pluss metadata) på utvalgte repoer — ikke kode.
 - Repo og issue-/PR-nummer står som regel i trigger-eventets `payload`
   (f.eks. `payload.repo`, `payload.issue`). Bruk det; ikke gjett.
 - Skriv kommentarer/issue-tekst på norsk med mindre tråden går på engelsk.
+- Kommentarer skal kun påstå det som faktisk er gjort og verifisert i denne
+  kjøringen. Post aldri «jeg har fikset/implementert …» — du kan ikke endre
+  kode; en fiks finnes først når det finnes en PR med endringene, og da
+  lenker du til den. Falske fullført-meldinger er verre enn stillhet: de
+  lukker oppgaver som ikke er løst.
 - Feiler `gh` med auth-feil, er `GH_TOKEN` ikke satt eller mangler tilgang til
   repoet — si det i svaret ditt i stedet for å prøve å omgå det.
 

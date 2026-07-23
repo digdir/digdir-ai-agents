@@ -241,10 +241,12 @@ export class SlackConnector {
   }
 
   /**
-   * Handles emoji reactions on any message: the reaction (and the message it
-   * sits on) is handed to the agent, which interprets what it means (e.g. a 👍
-   * as a positive-feedback / learning signal). The agent's classification then
-   * drives the response via the normal result flow.
+   * Handles emoji reactions on messages the bot is involved with: reactions on
+   * the bot's own messages, or on messages in threads where the bot
+   * participates. The reaction (and the message it sits on) is handed to the
+   * agent, which interprets what it means (e.g. a 👍 as a positive-feedback /
+   * learning signal). Reactions elsewhere in channels the bot happens to be a
+   * member of are ignored (issue #61).
    */
   private async onReaction(event: SlackReactionEvent): Promise<void> {
     // Skip our own reactions — the bot adds thinking_face/ack reactions itself,
@@ -260,12 +262,29 @@ export class SlackConnector {
 
     const channel = event.item.channel;
     const messageTs = event.item.ts;
+
+    // Filter before touching the message: only reactions on the bot's own
+    // messages, or in threads the bot already participates in. This must
+    // happen before the working reaction below — reacting first is exactly
+    // the noisy behavior the filter exists to stop.
+    const onOwnMessage = this.selfUserId !== undefined && event.item_user === this.selfUserId;
+    const context = await this.fetchThreadContext(channel, messageTs);
+    const inOwnThread =
+      context !== null && this.selfUserId !== undefined && context.authors.has(this.selfUserId);
+    if (!onOwnMessage && !inOwnThread) {
+      log.debug(
+        `Skipping reaction :${event.reaction}: on ${channel}@${messageTs} — not on our message or in a thread we participate in.`,
+      );
+      return;
+    }
+
     const by = event.item_user ? ` (message by ${event.item_user})` : "";
     log.info(`Picked up reaction :${event.reaction}: from ${event.user ?? "?"} on ${channel}@${messageTs}${by}.`);
 
     if (!this.queue) return; // Observe-only when the bridge is off.
 
-    const { text, threadTs } = await this.fetchMessageText(channel, messageTs);
+    const text = context?.text ?? "";
+    const threadTs = context?.threadTs ?? messageTs;
 
     // Show the working reaction on the reacted-to message while the agent runs.
     const willClear = this.awaitReply;
@@ -302,21 +321,47 @@ export class SlackConnector {
     );
   }
 
-  /** Fetches the text (and thread root) of a single message by channel + ts. */
-  private async fetchMessageText(channel: string, ts: string): Promise<{ text: string; threadTs: string }> {
+  /**
+   * Fetches the reacted-to message plus the thread it lives in. Uses
+   * `conversations.replies` rather than `conversations.history`: history only
+   * returns top-level messages, so a reacted-to thread reply came back empty
+   * ("fant ikke meldingsteksten", issue #61). Returns null when the lookup
+   * fails entirely.
+   */
+  private async fetchThreadContext(
+    channel: string,
+    ts: string,
+  ): Promise<{ text: string; threadTs: string; authors: Set<string> } | null> {
     try {
-      const res = await this.web.conversations.history({
-        channel,
-        latest: ts,
-        oldest: ts,
-        inclusive: true,
-        limit: 1,
-      });
-      const msg = (res.messages as Array<{ text?: string; thread_ts?: string }> | undefined)?.[0];
-      return { text: msg?.text ?? "", threadTs: msg?.thread_ts ?? ts };
+      let messages = await this.fetchReplies(channel, ts);
+      const target = messages.find((m) => m.ts === ts) ?? messages[0];
+      const threadTs = target?.thread_ts ?? ts;
+      // Given a reply's ts, Slack may return only that reply — re-fetch from
+      // the thread root so `authors` reflects the whole conversation.
+      if (threadTs !== ts && !messages.some((m) => m.ts === threadTs)) {
+        messages = await this.fetchReplies(channel, threadTs);
+      }
+      const authors = new Set<string>();
+      for (const m of messages) if (m.user) authors.add(m.user);
+      return { text: target?.text ?? "", threadTs, authors };
     } catch (err) {
-      log.warn("Could not fetch the reacted-to message text.", err);
-      return { text: "", threadTs: ts };
+      log.warn("Could not fetch the reacted-to message/thread.", err);
+      return null;
     }
+  }
+
+  private async fetchReplies(
+    channel: string,
+    ts: string,
+  ): Promise<Array<{ ts?: string; user?: string; text?: string; thread_ts?: string }>> {
+    const allMessages: Array<{ ts?: string; user?: string; text?: string; thread_ts?: string }> = [];
+    let cursor: string | undefined;
+    do {
+      const res = await this.web.conversations.replies({ channel, ts, limit: 100, cursor });
+      const messages = (res.messages ?? []) as Array<{ ts?: string; user?: string; text?: string; thread_ts?: string }>;
+      allMessages.push(...messages);
+      cursor = res.response_metadata?.next_cursor as string | undefined;
+    } while (cursor);
+    return allMessages;
   }
 }
