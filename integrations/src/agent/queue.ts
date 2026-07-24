@@ -406,9 +406,25 @@ export class AgentQueue {
     if (result.intent === "ack") return { kind: "ack" };
 
     // action / feedback / unknown → post the clean reply, falling back to the
-    // raw log for older results that carry no reply field.
+    // raw log for older results that carry no reply field. For GitHub we do
+    // not expose the internal agent log as a public comment — use a generic
+    // warning instead so transcriptions with internal context are never
+    // posted publicly. Slack keeps the legacy behaviour (raw log is fine in
+    // private channels). When extraction_failed is set, the agent found the
+    // RESULT_MARKER but produced malformed JSON; the raw log almost certainly
+    // contains the full transcription, so we skip it for proxy-agent on GitHub.
     let text = (result.reply ?? "").trim();
-    if (!text) text = (await this.readLog(agent, result)) || "✅ Agenten er ferdig, men produserte ingen tekst.";
+    if (!text) {
+      const extractionFailed = result.extraction_failed === true;
+      if (!extractionFailed || !this.isProxyAgent(agent)) {
+        text = await this.readLog(agent, result);
+      }
+      if (!text && extractionFailed && this.isProxyAgent(agent)) {
+        text = "⚠️ Agenten leverte uten strukturert svar — se logg.";
+      } else if (!text) {
+        text = "✅ Agenten er ferdig, men produserte ingen tekst.";
+      }
+    }
     return { kind: "message", text: truncate(text, this.config.maxReplyChars) };
   }
 
@@ -430,6 +446,12 @@ export class AgentQueue {
       log.warn(`Could not read log ${result.log} for "${result.id}".`, err);
       return "";
     }
+  }
+
+  /** Whether the agent's structured result was extracted at all — used to avoid
+   * posting raw internal logs as a public GitHub comment when extraction failed. */
+  private isProxyAgent(agent: AgentRoute): boolean {
+    return agent.name === "proxy-agent";
   }
 
   private async loadOffset(agent: AgentRoute): Promise<number> {

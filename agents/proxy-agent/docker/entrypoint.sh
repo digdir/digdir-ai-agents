@@ -148,8 +148,9 @@ Kontekst fra routeren (valgfritt):
 
 HELT TIL SLUTT skriver du en linje med KUN teksten:
 $RESULT_MARKER
-og deretter ett JSON-objekt (kan gå over flere linjer):
-{"intent":"$intents","reply":"<svaret ditt på norsk>"}
+og deretter ett JSON-objekt (kan gå over flere linjer). JSON-en skal stå rått —
+INGEN kodefence, ingen markdown, ingen tilleggstekst etter objektet. Eksempel:
+{"intent":"action","reply":"<svaret ditt på norsk>"}
 ${delegate_doc}
 EOF
 }
@@ -207,13 +208,35 @@ build_prompt() {
 }
 
 # Extracts the JSON block the agent printed after RESULT_MARKER (everything
-# after the last marker line). Empty if the agent produced no valid block.
+# after the last marker line). Handles markdown fences the LLM sometimes wraps
+# the result in (```json ... ```), which would otherwise make jq reject it.
+# Logs a WARN when the marker is found but extraction still fails — so we do
+# not silently drop delegations.
 extract_result_json() {
-  local log_file="$1" block
+  local log_file="$1" block has_marker=false
+  # Check whether the marker exists at all, so we can warn on malformed output.
+  if grep -q "^${RESULT_MARKER}$" "$log_file"; then
+    has_marker=true
+  fi
   block=$(awk -v m="$RESULT_MARKER" '$0==m{f=1;buf="";next} f{buf=buf $0 ORS} END{printf "%s",buf}' "$log_file")
+
+  # Strip leading/trailing fence lines: ```json / ``` (case-insensitive on the
+  # language tag). This is needed because LLM-er gjerne pakker JSON inni en
+  # markdown-kodefence selv når de blir bedt om rått objekt.
+  block=$(printf '%s' "$block" | sed -E '1{/^```[a-zA-Z]*$/d}' | sed -E '${/^```$/d}')
+
   if [[ -n "$block" ]] && jq -e . >/dev/null 2>&1 <<<"$block"; then
     printf '%s' "$block"
+    return 0
   fi
+
+  # Marker funnet, men vi klarte ikke parse JSON-en. Logg en WARN slik at
+  # delegeringen ikke går tapt stille — broen får en generisk feilmelding i
+  # stedet for å poste hele agentloggen som offentlig GitHub-kommentar.
+  if [[ "$has_marker" == true ]]; then
+    log "WARN: AGENT-RESULT-blokk funnet, men ugyldig JSON — delegering tapt. Fikk:${#block} tegn."
+  fi
+  return 1
 }
 
 process_event() {
@@ -235,9 +258,14 @@ process_event() {
   finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   # Pull the agent's classification (intent + reply + evt. delegate) out of
-  # the log, if present.
-  local result_json intent reply delegate
-  result_json=$(extract_result_json "$log_file")
+  # the log, if present. extract_result_json may return non-zero when the
+  # RESULT_MARKER is found but the JSON block is malformed — we catch that so
+  # `set -e` does not abort the process_event loop.
+  local result_json="" intent reply delegate extraction_failed=false
+  set +e
+  result_json=$(extract_result_json "$log_file") || extraction_failed=true
+  set -e
+
   if [[ -n "$result_json" ]]; then
     intent=$(jq -r '.intent // empty' <<<"$result_json")
     reply=$(jq -r '.reply // empty' <<<"$result_json")
@@ -259,7 +287,8 @@ process_event() {
     '{id: $id, status: $status, exit_code: $exit_code, log: $log, started_at: $started_at, finished_at: $finished_at}
        + (if $intent != "" then {intent: $intent} else {} end)
        + (if $reply  != "" then {reply:  $reply}  else {} end)
-       + (if $delegate != "" then {delegate: ($delegate | fromjson)} else {} end)' \
+       + (if $delegate != "" then {delegate: ($delegate | fromjson)} else {} end)
+       + (if $extraction_failed == true then {extraction_failed: true} else {} end)' \
     >>"$RESULT_FILE"
   log "Event $id ferdig (exit $exit_code, intent=${intent:-?}, logg: $log_file)"
 }
