@@ -225,7 +225,7 @@ extract_result_json() {
   # markdown-kodefence selv når de blir bedt om rått objekt.
   block=$(printf '%s' "$block" | sed -E '1{/^```[a-zA-Z]*$/d}' | sed -E '${/^```$/d}')
 
-  if [[ -n "$block" ]] && jq -e . >/dev/null 2>&1 <<<"$block"; then
+  if [[ -n "$block" ]] && jq -e 'if type == "object" then . else error("not an object") end' >/dev/null 2>&1 <<<"$block"; then
     printf '%s' "$block"
     return 0
   fi
@@ -234,8 +234,9 @@ extract_result_json() {
   # delegeringen ikke går tapt stille — broen får en generisk feilmelding i
   # stedet for å poste hele agentloggen som offentlig GitHub-kommentar.
   if [[ "$has_marker" == true ]]; then
-    log "WARN: AGENT-RESULT-blokk funnet, men ugyldig JSON — delegering tapt. Fikk:${#block} tegn."
+    printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "WARN: AGENT-RESULT-blokk funnet, men ugyldig JSON — delegering tapt. Fikk:${#block} tegn." >&2
   fi
+  result_json=""
   return 1
 }
 
@@ -284,6 +285,7 @@ process_event() {
     --arg delegate "$delegate" \
     --arg started_at "$started" \
     --arg finished_at "$finished" \
+    --argjson extraction_failed "$extraction_failed" \
     '{id: $id, status: $status, exit_code: $exit_code, log: $log, started_at: $started_at, finished_at: $finished_at}
        + (if $intent != "" then {intent: $intent} else {} end)
        + (if $reply  != "" then {reply:  $reply}  else {} end)
