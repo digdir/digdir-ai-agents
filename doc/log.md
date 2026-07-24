@@ -6,6 +6,18 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-24** — Plan for nvt-agent-integrasjon
+  ([plans/nvt-agent-integrasjon.md](plans/nvt-agent-integrasjon.md)):
+  Mirkos nvt-agent (isolerte agentmiljøer med code-server, agentd og
+  credential-broker) tas inn som neste generasjons utførende kodeagent
+  («fat-dev») bak uendret filkontrakt. Nøkkelgrep: deterministisk
+  nvt-bridge (topic → levende nvt-instans, prompts via `agentdctl`),
+  samtale fortsatt via integrations, dedikert bot-PAT i brokeren
+  (static_token, GitHub App senere), LM Studio som første modell-backend,
+  egen admin-konsoll-app med topic-tverrsnitt, og driver-lease for å
+  veksle headless/hands-on/ekstern på samme work-in-progress. Milepæler
+  M0–M4; jr-containeren fra #90 pensjoneres når M1 er verifisert.
+
 - **2026-07-24** — Junior-agenten containerisert (issue #90): engangs-
   container per event i stedet for interaktiv CLI på hosten. Runner
   (`scripts/jr-runner.ps1`, erstatter `junior-agent.ps1`) poller innboksen
