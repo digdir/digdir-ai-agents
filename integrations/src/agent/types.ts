@@ -93,6 +93,12 @@ export interface ResultLine {
     /** Optional extra context (e.g. an issue URL) passed into the event. */
     payload?: Record<string, unknown>;
   };
+  /**
+   * Set by proxy-agent when RESULT_MARKER was found in the log but the JSON
+   * block could not be parsed (e.g. wrapped in a markdown fence). Used by the
+   * queue to avoid posting the raw internal log as a public comment on GitHub.
+   */
+  extraction_failed?: boolean;
   started_at?: string;
   finished_at?: string;
 }
