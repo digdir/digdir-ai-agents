@@ -1,39 +1,71 @@
-# local-cc-jr-developer — junior utførende kodeagent (Claude Code + lokal modell)
+# local-cc-jr-developer — junior utførende kodeagent (container)
 
-Junior-utgaven av den utførende kodeagenten: samme runtime (Claude Code CLI,
-interaktivt) og samme filkontrakt som
-[`local-cc-coding-agent`](../local-cc-coding-agent/), men modellen er en
-**lokal kodemodell** servert av LM Studio via dets Anthropic-kompatible
-`/v1/messages`-API. Ingen proxy eller oversettelseslag — bare env-variabler
-som peker CLI-en på det lokale endepunktet.
+Junior-utgaven av den utførende kodeagenten: Claude Code CLI mot en **lokal
+kodemodell** servert av LM Studio via dets Anthropic-kompatible
+`/v1/messages`-API. Samme filkontrakt som de andre agentene
+(`triggers/inbox.jsonl` inn, `triggers/results.jsonl` +
+`triggers/logs/<id>.log` ut), men i motsetning til
+[`local-cc-coding-agent`](../local-cc-coding-agent/) kjører den ikke
+interaktivt på hosten: hvert event behandles av en **engangs-container**
+med eget workspace og egen Claude-sesjon per topic.
 
-Oppstart er én kommando (skriptet setter env og starter CLI-en fra denne
-katalogen):
+## Arkitektur
+
+- **Runner på hosten** (`scripts/jr-runner.ps1`): dum supervisor uten LLM.
+  Poller `triggers/inbox.jsonl`, finner ubehandlede events (id uten linje i
+  `results.jsonl`), grupperer på topic (opphavs-tråden/issuet:
+  `payload.origin.event_id` uten delta-suffiks) og kjører `docker run --rm`
+  per event — seriellt innen et topic, parallelt på tvers (maks N).
+  Docker-tilgangen ligger hos runneren; containeren har aldri Docker-socket.
+- **Container** (`docker/`): node-slim + Claude Code CLI + git + gh +
+  ripgrep, non-root, `cap_drop: ALL`, `no-new-privileges`. Entrypointet
+  behandler ÉN oppgave: leser eventet, kjører `claude -p` headless
+  (stream-json) og skriver resultatlinje + logg til `/triggers`.
+  `--dangerously-skip-permissions` er akseptabelt her — containeren er
+  isolasjonsgrensen (samme argument som Chromium-sandboxen i proxy-imaget).
+- **Workspace per topic:** hvert topic får `workspaces/<topic>/`
+  (gitignorert) mountet som `/workspace`; agenten kloner arbeidsrepoet dit
+  selv med sitt eget token. Monorepoet, deploy-klonen og felles
+  `workspaces_repos/` mountes aldri inn — agenten kan strukturelt ikke røre
+  dem.
+- **Samtalekontinuitet per topic:** Claude Code-sesjonsstate ligger i
+  topic-workspacet (`CLAUDE_CONFIG_DIR`). Første event i et topic starter ny
+  sesjon; oppfølgingsevents kjører `claude -p --resume <session-id>`
+  (session-id fra forrige kjørings output). Nye topics starter ferskt.
+- **Egen tilgang, samme identitet:** agenten bruker pipelinens bot-konto med
+  et **eget fine-grained PAT** kun for denne agenten (Contents RW + Pull
+  requests RW, begrenset til arbeidsrepoene) — aldri operatørens PAT, aldri
+  gjenbruk av proxyens tokens. Branch protection gjelder boten fullt ut, og
+  bot-kontoen skal **ikke** stå i `GITHUB_ALLOWED_USERS`. Kontonavn og token
+  ligger kun i `.env` (gitignorert).
+
+## Oppstart
 
 ```powershell
-.\scripts\junior-agent.ps1
-# > lytt på innboksen
+Copy-Item agents\local-cc-jr-developer\.env.example agents\local-cc-jr-developer\.env
+# fyll inn GH_TOKEN (agentens eget PAT) og git-identitet i .env
+
+.\scripts\jr-runner.ps1          # bygger imaget ved behov og poller innboksen
 ```
 
-Instruksene ligger i [CLAUDE.md](CLAUDE.md) og lastes automatisk når sesjonen
-starter her. Viktigste forskjell fra senior-agenten: junior-agenten skal ta
-**godt definerte, avgrensede, lav-risiko** oppgaver — og er eksplisitt
-instruert til å melde tilbake i stedet for å gjette når en oppgave er uklar
-eller større enn antatt.
+Instruksene agenten kjører med ligger i [CLAUDE.md](CLAUDE.md) — de bakes
+inn i imaget og lastes i workspacet ved hver kjøring (endrer du CLAUDE.md,
+bygg imaget på nytt: `docker build -t local-cc-jr-developer:latest -f
+docker/Dockerfile .` fra denne katalogen). Viktigste forskjell fra
+senior-agenten: junior-agenten skal ta **godt definerte, avgrensede,
+lav-risiko** oppgaver — og er eksplisitt instruert til å melde tilbake i
+stedet for å gjette når en oppgave er uklar eller større enn antatt.
 
-Oppgaver delegeres hit av andre agenter (proxy-agenten med `DELEGATE_AGENTS`)
-via broen — integrations må ha `local-cc-jr-developer` i `AGENT_ROUTES`.
-Kontrakten er den samme som for alle agenter: `triggers/inbox.jsonl` inn,
-`triggers/results.jsonl` + `triggers/logs/<id>.log` ut. Svar postes automatisk
-tilbake i den opprinnelige Slack-tråden / GitHub-issuet.
+## Krav
 
-## Krav til LM Studio
+- Docker Desktop på hosten (runneren orkestrerer containerne).
+- LM Studio kjører på hosten og serverer på `http://127.0.0.1:1234`
+  (= `host.docker.internal:1234` fra containeren), med modellen fra `.env`
+  lastet og **romslig kontekstvindu** — Claude Code er kontekst-tungt, så
+  minst 25k tokens, helst mer.
 
-- LM Studio kjører på hosten og serverer på `http://127.0.0.1:1234`.
-- Modellen `ornith-1.0-35b-nvfp4-mtp` er lastet, med **romslig
-  kontekstvindu** — Claude Code er kontekst-tungt, så minst 25k tokens,
-  helst mer.
-
-Arbeidsklonene ligger i den gitignorerte anker-folderen
-`workspaces_repos/<provider>/<org>/<repo>` på monorepo-rot; leveransen er
-alltid branch + PR med et menneske som review-gate.
+Oppgaver delegeres hit av andre agenter (proxy-agenten med
+`DELEGATE_AGENTS`) via broen — integrations må ha `local-cc-jr-developer` i
+`AGENT_ROUTES`. Svar postes automatisk tilbake i den opprinnelige
+Slack-tråden / GitHub-issuet. Leveransen er alltid branch + PR med et
+menneske som review-gate.
