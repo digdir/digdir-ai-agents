@@ -6,6 +6,19 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-27** — `apps/llm-gateway/`: lokal LLM-gateway som samler all
+  modell-konfig på ett sted. Konsumenter (integrations-routeren,
+  proxy-agenten) peker på ett endepunkt (`:8787/v1`) med en fake API-nøkkel
+  som identifiserer konsumenten; gatewayen ruter per regel (path/modell) til
+  riktig backend og legger på den ekte nøkkelen — routerens chat og
+  embeddings kan dermed gå til hver sin backend over samme base-URL
+  (routeren har fortsatt kun ett `ROUTER_BASE_URL`). Konsumentene bruker
+  stabile modell-alias; backend-bytte er én endring i gatewayens
+  `routes.json`. Null avhengigheter (Node ≥21), container-kjøring med
+  publisering kun på `127.0.0.1`. Arvtakeren til den frittstående
+  `llm-proxy-proxy`-en. Foranledning: fjern LM Studio-backend utilgjengelig
+  — chat måtte via Aivar mens embeddings kjøres på lokal LM Studio.
+
 - **2026-07-24** — Junior-agenten containerisert (issue #90): engangs-
   container per event i stedet for interaktiv CLI på hosten. Runner
   (`scripts/jr-runner.ps1`, erstatter `junior-agent.ps1`) poller innboksen

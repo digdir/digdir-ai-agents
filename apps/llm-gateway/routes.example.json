@@ -1,0 +1,17 @@
+{
+  "consumers": {
+    "integrations-router": {
+      "keys": ["integrations-router"],
+      "rules": [
+        { "pathSuffix": "/embeddings", "upstream": "lmstudio", "model": "text-embedding-qwen3-embedding-4b" },
+        { "upstream": "aivar", "model": "aivar:gemma4" }
+      ]
+    },
+    "proxy-agent": {
+      "keys": ["proxy-agent", "none"],
+      "rules": [
+        { "upstream": "aivar", "model": "aivar:gemma4" }
+      ]
+    }
+  }
+}
