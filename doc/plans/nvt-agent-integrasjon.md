@@ -169,16 +169,23 @@ arbeidsrepoene).
 - PR-er attribueres til bot-kontoen, som ikke skal stå i
   `GITHUB_ALLOWED_USERS`, og hvis hendelser self-filtreres av polleren som
   i dag. Botnavnet holdes utenfor repoet — kun env/`.broker/`-config.
-- **Modell: LM Studio først** («fat-jr»-profil, som dagens jr-dev):
-  runtime-miljøet settes med `ANTHROPIC_BASE_URL` mot LM Studios
-  Anthropic-kompatible API på hosten (`host.docker.internal:1234` /
-  `host-gateway`; merk at agentcontaineren bruker
-  `network_mode: service:docker`, så host-oppslaget må verifiseres i M0),
-  `ANTHROPIC_AUTH_TOKEN=lmstudio` og `ANTHROPIC_MODEL`/
-  `ANTHROPIC_SMALL_FAST_MODEL` som i `scripts/junior-agent.ps1`. En ekte
-  «fat-dev»-profil (Anthropic-konto via `CLAUDE_CONFIG_DIR`-seed eller
-  brokerens `claude_oauth`) er samme oppsett med annen env — kan legges til
-  når som helst.
+- **Modell: llm-gatewayen med subscription-OAuth** (samme oppsett som jr-/
+  sr-agentene kjører på i dag, se `apps/llm-gateway/README.md`):
+  runtime-miljøet settes med `ANTHROPIC_BASE_URL` mot gatewayen på hosten
+  (`http://host.docker.internal:8787`; merk at agentcontaineren bruker
+  `network_mode: service:docker`, så host-oppslaget må verifiseres i M0) og
+  `ANTHROPIC_AUTH_TOKEN=<konsument-nøkkelen>`. fat-dev får sin **egen
+  konsument med egen fake-nøkkel** i gatewayens `routes.json`, slik at
+  trafikken kan skilles i loggen og nøkkelen revokeres alene.
+  **Modell-allowlisten håndheves i gatewayen**: konsumentens regler
+  bestemmer hvilke modeller som slipper gjennom (`whenModel`), og en
+  forespørsel uten treff avvises (fail closed) — agenten kan altså ikke
+  velge en dyrere eller uønsket modell selv.
+  Det ekte OAuth-tokenet bor **kun i gatewayens `.env`** og er aldri inne i
+  agentcontaineren — samme credential non-possession som brokeren gir for
+  git-tokenet. LM Studio (eller en annen Anthropic-kompatibel backend) er
+  et alternativ: ett bytte av upstream i `routes.json`, uten å røre
+  agentens env.
 - `--dangerously-skip-permissions` settes av nvt selv ved
   `autonomy: trusted-local` — akseptabelt av samme grunn som i issue #90:
   containeren er isolasjonsgrensen. Aldri på host.
@@ -261,7 +268,8 @@ Kun én «driver» om gangen, håndhevet av bridgen via en lease-fil per topic
 jr-token er laget). Dette sporet er arvtakeren: nvt løser #90s tre
 problemer (identitet, filsystem, sesjonsmodell) og mer. Når M1 her er
 verifisert, pensjoneres jr-containeren eller re-provisjoneres som «fat-jr»
-(nvt-instans mot LM Studio). Token-modellen fra #90 (dedikert fine-grained
+(nvt-instans med en billigere modell-rute i gatewayen, evt. LM Studio som
+upstream). Token-modellen fra #90 (dedikert fine-grained
 PAT på bot-kontoen) gjenbrukes som broker-provider her — men fat-dev bør få
 sitt *eget* token, ikke dele jr-ens, så de kan skilles i audit og
 revokeres hver for seg.
@@ -271,12 +279,14 @@ revokeres hver for seg.
 **M0 — Sandkasse-bevis (manuelt, ingen repo-endringer).** Bygg nvt fra
 WSL2 (`make runtime-build broker-build …`, `infra-up`), én claude-instans i
 direct mode med `static_token`-grant (dedikert bot-PAT) mot et testrepo, og
-LM Studio som modell-backend (`ANTHROPIC_BASE_URL` mot hosten — verifiser
-host-oppslag fra `network_mode: service:docker`). Verifiser for hånd:
+llm-gatewayen som modell-backend (`ANTHROPIC_BASE_URL` mot gatewayen på
+hosten, port 8787 — verifiser at gatewayen faktisk nås fra nvt-instansen,
+som kjører med `network_mode: service:docker`). Verifiser for hånd:
 prompt via `agentdctl` → agenten lager branch+PR med broker-token;
 code-server-innhopp; `events.jsonl`-tailing.
-*Akseptanse: PR opprettet av bot-identiteten uten token i containeren, på
-lokal LM Studio-modell.*
+*Akseptanse: PR opprettet av bot-identiteten uten token i containeren, mot
+llm-gatewayen med subscription-OAuth (OAuth-tokenet kun i gatewayens
+`.env`).*
 
 **M1 — Bridge + agent bak filkontrakten.** Ny katalog
 `agents/nvt-fat-developer/` (triggers/, README, instruks-mal for
@@ -298,8 +308,7 @@ commit-kollisjoner; ekstern modus verifisert med sr-dev på samme branch.*
 
 **M4 — Hardening/utvidelser.** GitHub App-provider (kortlevde tokens i
 stedet for statisk PAT), mediated egress, TTL/opprydding, opt-in
-github-watcher for CI-checks, Anthropic-backet «fat-dev»-profil, evt.
-k8s-spor.
+github-watcher for CI-checks, evt. k8s-spor.
 
 ## Beslutninger (Ole, 2026-07-24)
 
@@ -308,7 +317,13 @@ k8s-spor.
 2. **Vertsmiljø:** Windows + WSL2 hos Ole, Mac hos Mirko —
    miljøuavhengighet er et krav; bridgen bygges for container-kjøring
    (docker-outside-of-docker) med host-node-prosess som fallback.
-3. **Modell:** LM Studio som backend først, som dagens jr-dev.
+3. **Modell (endret 2026-07-27, [#96](https://github.com/digdir/digdir-ai-agents/issues/96)):**
+   llm-gatewayen med subscription-OAuth først, som jr-/sr-agentene kjører i
+   dag — fat-dev blir en egen konsument i gatewayens `routes.json` med egen
+   fake-nøkkel og modell-allowlist, og OAuth-tokenet bor kun i gatewayens
+   `.env`. LM Studio er nedgradert til *alternativ* backend (bytte av
+   upstream i `routes.json`). Erstatter den opprinnelige beslutningen om LM
+   Studio/«fat-jr» som første backend.
 4. **#90:** allerede gjennomført og under testing; nvt-sporet er
    arvtakeren.
 
