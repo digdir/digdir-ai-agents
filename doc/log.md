@@ -6,6 +6,17 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-27** — Modell-backend for fat-dev endret (issue #96):
+  llm-gatewayen med subscription-OAuth erstatter LM Studio som *første*
+  backend i [plans/nvt-agent-integrasjon.md](plans/nvt-agent-integrasjon.md).
+  fat-dev blir en egen konsument i gatewayens `routes.json` med egen
+  fake-nøkkel og modell-allowlist — samme mønster som jr-/sr-agentene
+  kjører på, der OAuth-tokenet kun bor i gatewayens `.env` og aldri i
+  agentcontaineren (credential non-possession). LM Studio er nedgradert til
+  alternativ backend (bytte av upstream i `routes.json`).
+  M0-verifikasjonen gjelder nå host-oppslag mot gatewayen (port 8787) fra
+  `network_mode: service:docker`. M0-økten gjenstår.
+
 - **2026-07-24** — Plan for nvt-agent-integrasjon
   ([plans/nvt-agent-integrasjon.md](plans/nvt-agent-integrasjon.md)):
   Mirkos nvt-agent (isolerte agentmiljøer med code-server, agentd og
