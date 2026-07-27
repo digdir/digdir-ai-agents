@@ -1,38 +1,48 @@
 <#
 .SYNOPSIS
-  Runner for junior-kodeagenten: poller triggers/inbox.jsonl og kjører én
-  engangs-container per ubehandlet event.
+  Runner for containeriserte kodeagenter: poller agentens triggers/inbox.jsonl
+  og kjører én engangs-container per ubehandlet event.
 
 .DESCRIPTION
-  Dum supervisor uten LLM. Finner ubehandlede events (id uten linje i
-  triggers/results.jsonl — samme dedupe-regel som resten av pipelinen),
-  grupperer dem på topic (payload.origin.event_id uten delta-suffiks), og
-  kjører `docker run --rm` per event. Seriellt innen et topic (samme
-  workspace og Claude-sesjon), parallelt på tvers av topics (maks
-  -MaxParallel samtidige).
+  Dum supervisor uten LLM, felles for alle agenter som følger
+  engangs-container-mønsteret (jr, sr). Finner ubehandlede events (id uten
+  linje i triggers/results.jsonl — samme dedupe-regel som resten av
+  pipelinen), grupperer dem på topic (payload.origin.event_id uten
+  delta-suffiks), og kjører `docker run --rm` per event. Seriellt innen et
+  topic (samme workspace og Claude-sesjon), parallelt på tvers av topics
+  (maks -MaxParallel samtidige).
 
-  Hvert topic får sitt eget workspace i agents/local-cc-jr-developer/
-  workspaces/<topic>/ (gitignorert), mountet som /workspace. Containeren
-  har aldri Docker-socket, og hverken monorepoet, deploy-klonen eller
+  Hvert topic får sitt eget workspace i agents/<navn>/workspaces/<topic>/
+  (gitignorert), mountet som /workspace. Containeren har aldri
+  Docker-socket, og hverken monorepoet, deploy-klonen eller
   workspaces_repos/ mountes inn.
 
-  Forutsetning: agents/local-cc-jr-developer/.env finnes (kopiér fra
-  .env.example og fyll inn agentens eget scopede GH_TOKEN).
+  Forutsetning: agents/<navn>/.env finnes (kopiér fra .env.example og fyll
+  inn agentens eget scopede GH_TOKEN).
+
+.PARAMETER AgentName
+  Agentkatalogen under agents/ (f.eks. local-cc-jr-developer eller
+  local-cc-coding-agent). Imaget heter <AgentName>:latest med mindre
+  -Image overstyrer.
 
 .EXAMPLE
-  .\scripts\jr-runner.ps1
-  .\scripts\jr-runner.ps1 -MaxParallel 3 -PollSeconds 5
+  .\scripts\agent-runner.ps1 -AgentName local-cc-jr-developer
+  .\scripts\agent-runner.ps1 -AgentName local-cc-coding-agent -MaxParallel 1
 #>
 param(
+  [Parameter(Mandatory = $true)]
+  [ValidatePattern('^[a-zA-Z0-9._-]+$')]
+  [string]$AgentName,
   [int]$MaxParallel = 2,
   [int]$PollSeconds = 10,
-  [string]$Image = "local-cc-jr-developer:latest"
+  [string]$Image = ""
 )
 
 $ErrorActionPreference = "Stop"
+if ($Image -eq "") { $Image = "${AgentName}:latest" }
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
-$agentDir = Join-Path $repoRoot "agents\local-cc-jr-developer"
+$agentDir = Join-Path $repoRoot "agents\$AgentName"
 $triggersDir = Join-Path $agentDir "triggers"
 $inboxFile = Join-Path $triggersDir "inbox.jsonl"
 $resultsFile = Join-Path $triggersDir "results.jsonl"
@@ -47,9 +57,12 @@ if (-not (Test-Path $knowledgeDir)) {
 }
 
 function Write-Log([string]$msg) {
-  Write-Host ("[{0:yyyy-MM-ddTHH:mm:ssZ}] {1}" -f (Get-Date).ToUniversalTime(), $msg)
+  Write-Host ("[{0:yyyy-MM-ddTHH:mm:ssZ}] [{1}] {2}" -f (Get-Date).ToUniversalTime(), $AgentName, $msg)
 }
 
+if (-not (Test-Path $agentDir)) {
+  Write-Error "Ukjent agent: $agentDir finnes ikke."
+}
 if (-not (Test-Path $envFile)) {
   Write-Error "Mangler $envFile — kopiér .env.example til .env og fyll inn agentens token."
 }
@@ -112,7 +125,7 @@ while ($true) {
 
     $dockerArgs = @(
       "run", "--rm",
-      "--name", "jr-$safeId",
+      "--name", "agent-$AgentName-$safeId",
       "--add-host", "host.docker.internal:host-gateway",
       "--security-opt", "no-new-privileges:true",
       "--cap-drop", "ALL",

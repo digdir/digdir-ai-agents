@@ -17,6 +17,44 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
   M0-verifikasjonen gjelder nå host-oppslag mot gatewayen (port 8787) fra
   `network_mode: service:docker`. M0-økten gjenstår.
 
+- **2026-07-27** — Senior-agenten containerisert + headless drift: `agents/
+  local-cc-coding-agent/` følger nå samme engangs-container-mønster som
+  junior (#90) — eget scopet PAT fra bot-kontoen (aldri operatørens
+  identitet), workspace + Claude-sesjon per topic, Opus via llm-gatewayen
+  (konsument `sr-developer`). Den interaktive utgaven (operatørens Claude
+  Code i agent-katalogen) er historikk. Felles runner
+  (`scripts/agent-runner.ps1 -AgentName <navn>`, erstatter `jr-runner.ps1`)
+  og `scripts/install-agent-tasks.ps1` registrerer self-update-watch +
+  begge runnerne som Scheduled Tasks — hele pipelinen kjører uten lokale
+  konsoller. Rollefordeling uendret: senior tar komplekse/uklare/
+  arkitekturtunge oppgaver (utøver skjønn, men spør ved uklar intensjon);
+  junior tar avgrensede lav-risiko-oppgaver.
+
+- **2026-07-27** — llm-gateway: Claude Code-agenter (jr-dev) kan kjøre mot
+  Anthropic med subscription-OAuth uten at tokenet er inne i containeren —
+  credential-non-possession-mønsteret fra nvt-agents mediated mode i
+  miniatyr (jf. `doc/plans/nvt-agent-integrasjon.md`). Langlivet token fra
+  `claude setup-token` bor kun i gatewayens `.env` (upstream `anthropic`);
+  ny generisk `appendHeaders` per regel fletter `anthropic-beta:
+  oauth-2025-04-20` inn i klientens beta-liste (appender, erstatter aldri —
+  lærdom fra nvt). Agentens env: base-URL mot gatewayen + konsument-nøkkel.
+  Foranledning: fjern LM Studio fortsatt utilgjengelig og Aivar mangler
+  Anthropic-format — dette gir jr-dev backend igjen, med uendret
+  GitHub-identitet og sandbox.
+
+- **2026-07-27** — `apps/llm-gateway/`: lokal LLM-gateway som samler all
+  modell-konfig på ett sted. Konsumenter (integrations-routeren,
+  proxy-agenten) peker på ett endepunkt (`:8787/v1`) med en fake API-nøkkel
+  som identifiserer konsumenten; gatewayen ruter per regel (path/modell) til
+  riktig backend og legger på den ekte nøkkelen — routerens chat og
+  embeddings kan dermed gå til hver sin backend over samme base-URL
+  (routeren har fortsatt kun ett `ROUTER_BASE_URL`). Konsumentene bruker
+  stabile modell-alias; backend-bytte er én endring i gatewayens
+  `routes.json`. Null avhengigheter (Node ≥21), container-kjøring med
+  publisering kun på `127.0.0.1`. Arvtakeren til den frittstående
+  `llm-proxy-proxy`-en. Foranledning: fjern LM Studio-backend utilgjengelig
+  — chat måtte via Aivar mens embeddings kjøres på lokal LM Studio.
+
 - **2026-07-24** — Plan for nvt-agent-integrasjon
   ([plans/nvt-agent-integrasjon.md](plans/nvt-agent-integrasjon.md)):
   Mirkos nvt-agent (isolerte agentmiljøer med code-server, agentd og
