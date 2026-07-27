@@ -6,6 +6,18 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-27** — llm-gateway: Claude Code-agenter (jr-dev) kan kjøre mot
+  Anthropic med subscription-OAuth uten at tokenet er inne i containeren —
+  credential-non-possession-mønsteret fra nvt-agents mediated mode i
+  miniatyr (jf. `doc/plans/nvt-agent-integrasjon.md`). Langlivet token fra
+  `claude setup-token` bor kun i gatewayens `.env` (upstream `anthropic`);
+  ny generisk `appendHeaders` per regel fletter `anthropic-beta:
+  oauth-2025-04-20` inn i klientens beta-liste (appender, erstatter aldri —
+  lærdom fra nvt). Agentens env: base-URL mot gatewayen + konsument-nøkkel.
+  Foranledning: fjern LM Studio fortsatt utilgjengelig og Aivar mangler
+  Anthropic-format — dette gir jr-dev backend igjen, med uendret
+  GitHub-identitet og sandbox.
+
 - **2026-07-27** — `apps/llm-gateway/`: lokal LLM-gateway som samler all
   modell-konfig på ett sted. Konsumenter (integrations-routeren,
   proxy-agenten) peker på ett endepunkt (`:8787/v1`) med en fake API-nøkkel

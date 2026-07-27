@@ -12,6 +12,12 @@
       "rules": [
         { "upstream": "aivar", "model": "aivar:gemma4" }
       ]
+    },
+    "jr-developer": {
+      "keys": ["jr-developer"],
+      "rules": [
+        { "upstream": "anthropic", "appendHeaders": { "anthropic-beta": "oauth-2025-04-20" } }
+      ]
     }
   }
 }
