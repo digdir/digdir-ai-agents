@@ -70,7 +70,11 @@ foreach ($t in $tasks) {
     -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -Command `"$command`"" `
     -WorkingDirectory $repoRoot
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+  # Batteri-flaggene er ikke pynt: Task Schedulers default er å STOPPE
+  # kjørende tasks når maskinen går på batteri — på en laptop dør runnerne
+  # stille i det øyeblikket laderen ryker (observert 2026-07-27).
   $settings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 2) `
     -ExecutionTimeLimit (New-TimeSpan -Days 0) `
     -MultipleInstances IgnoreNew `
