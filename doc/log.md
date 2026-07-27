@@ -6,6 +6,19 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-27** — Senior-agenten containerisert + headless drift: `agents/
+  local-cc-coding-agent/` følger nå samme engangs-container-mønster som
+  junior (#90) — eget scopet PAT fra bot-kontoen (aldri operatørens
+  identitet), workspace + Claude-sesjon per topic, Opus via llm-gatewayen
+  (konsument `sr-developer`). Den interaktive utgaven (operatørens Claude
+  Code i agent-katalogen) er historikk. Felles runner
+  (`scripts/agent-runner.ps1 -AgentName <navn>`, erstatter `jr-runner.ps1`)
+  og `scripts/install-agent-tasks.ps1` registrerer self-update-watch +
+  begge runnerne som Scheduled Tasks — hele pipelinen kjører uten lokale
+  konsoller. Rollefordeling uendret: senior tar komplekse/uklare/
+  arkitekturtunge oppgaver (utøver skjønn, men spør ved uklar intensjon);
+  junior tar avgrensede lav-risiko-oppgaver.
+
 - **2026-07-27** — llm-gateway: Claude Code-agenter (jr-dev) kan kjøre mot
   Anthropic med subscription-OAuth uten at tokenet er inne i containeren —
   credential-non-possession-mønsteret fra nvt-agents mediated mode i

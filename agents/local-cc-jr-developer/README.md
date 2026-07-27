@@ -1,17 +1,18 @@
 # local-cc-jr-developer — junior utførende kodeagent (container)
 
-Junior-utgaven av den utførende kodeagenten: Claude Code CLI mot en **lokal
-kodemodell** servert av LM Studio via dets Anthropic-kompatible
-`/v1/messages`-API. Samme filkontrakt som de andre agentene
-(`triggers/inbox.jsonl` inn, `triggers/results.jsonl` +
-`triggers/logs/<id>.log` ut), men i motsetning til
-[`local-cc-coding-agent`](../local-cc-coding-agent/) kjører den ikke
-interaktivt på hosten: hvert event behandles av en **engangs-container**
-med eget workspace og egen Claude-sesjon per topic.
+Junior-utgaven av den utførende kodeagenten: Claude Code CLI på en rimelig
+modell (Sonnet/Haiku via llm-gatewayen med subscription-OAuth, eller en
+lokal modell via LM Studio — se `.env.example`). Samme filkontrakt som de
+andre agentene (`triggers/inbox.jsonl` inn, `triggers/results.jsonl` +
+`triggers/logs/<id>.log` ut) og samme container-arkitektur som
+senior-utgaven [`local-cc-coding-agent`](../local-cc-coding-agent/):
+hvert event behandles av en **engangs-container** med eget workspace og
+egen Claude-sesjon per topic.
 
 ## Arkitektur
 
-- **Runner på hosten** (`scripts/jr-runner.ps1`): dum supervisor uten LLM.
+- **Runner på hosten** (`scripts/agent-runner.ps1 -AgentName
+  local-cc-jr-developer`): dum supervisor uten LLM.
   Poller `triggers/inbox.jsonl`, finner ubehandlede events (id uten linje i
   `results.jsonl`), grupperer på topic (opphavs-tråden/issuet:
   `payload.origin.event_id` uten delta-suffiks) og kjører `docker run --rm`
@@ -45,7 +46,9 @@ med eget workspace og egen Claude-sesjon per topic.
 Copy-Item agents\local-cc-jr-developer\.env.example agents\local-cc-jr-developer\.env
 # fyll inn GH_TOKEN (agentens eget PAT) og git-identitet i .env
 
-.\scripts\jr-runner.ps1          # bygger imaget ved behov og poller innboksen
+.\scripts\agent-runner.ps1 -AgentName local-cc-jr-developer
+# bygger imaget ved behov og poller innboksen; kjør headless via
+# scripts\install-agent-tasks.ps1 (Scheduled Task) i stedet for en konsoll
 ```
 
 Instruksene agenten kjører med ligger i [CLAUDE.md](CLAUDE.md) — de bakes
@@ -59,10 +62,10 @@ stedet for å gjette når en oppgave er uklar eller større enn antatt.
 ## Krav
 
 - Docker Desktop på hosten (runneren orkestrerer containerne).
-- LM Studio kjører på hosten og serverer på `http://127.0.0.1:1234`
-  (= `host.docker.internal:1234` fra containeren), med modellen fra `.env`
-  lastet og **romslig kontekstvindu** — Claude Code er kontekst-tungt, så
-  minst 25k tokens, helst mer.
+- LLM-backend per `.env`: llm-gatewayen på `127.0.0.1:8787` (variant A,
+  default) — eller LM Studio på `127.0.0.1:1234` med modellen lastet og
+  **romslig kontekstvindu** (variant B; Claude Code er kontekst-tungt, så
+  minst 25k tokens, helst mer).
 
 Oppgaver delegeres hit av andre agenter (proxy-agenten med
 `DELEGATE_AGENTS`) via broen — integrations må ha `local-cc-jr-developer` i
