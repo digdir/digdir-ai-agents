@@ -16,3 +16,4 @@ name: digdir-ai-agents
 include:
   - integrations/docker-compose.yml
   - agents/proxy-agent/docker-compose.yml
+  - apps/llm-gateway/docker-compose.yml
