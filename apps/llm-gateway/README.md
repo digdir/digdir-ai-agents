@@ -53,6 +53,29 @@ Alternativt rett på hosten (Node ≥21): `npm start`.
 
 Helsesjekk uten auth: `GET /healthz` (kun navn — aldri nøkler).
 
+## Claude Code-agenter med subscription-OAuth (jr-dev)
+
+Claude Code snakker Anthropic-formatet (`/v1/messages`), som gatewayen sender
+urørt videre — så en Claude Code-agent i container kan bruke gatewayen som
+base-URL, med et **subscription-OAuth-token som aldri er inne i containeren**
+(samme «credential non-possession»-idé som nvt-agents mediated mode, i
+miniatyr — uten refresh-maskineri, siden `setup-token` er langlivet):
+
+1. Kjør `claude setup-token` i et pålogget miljø (krever abonnement) og legg
+   tokenet i `UPSTREAM_ANTHROPIC_KEY` i gatewayens `.env`.
+2. Gi agenten en konsument-regel mot `anthropic` med
+   `"appendHeaders": { "anthropic-beta": "oauth-2025-04-20" }` — OAuth-tokens
+   krever denne beta-flaggingen, og klienten vet ikke selv at den kjører OAuth.
+   `appendHeaders` *fletter* verdien inn i klientens eksisterende beta-liste
+   (erstatter aldri — klienten eier sin egen feature-liste).
+3. Agentens miljø: `ANTHROPIC_BASE_URL=http://host.docker.internal:8787` og
+   `ANTHROPIC_AUTH_TOKEN=<konsument-nøkkelen>`. Ingen modell-overstyring —
+   ekte modellnavn går rett gjennom.
+
+Trafikken er ekte Claude Code-trafikk (kun auth-headeren byttes), så
+Anthropics krav om Claude Code-systemprompt for subscription-tokens er
+oppfylt av seg selv.
+
 ## Sikkerhet
 
 - Ekte nøkler finnes kun i `.env` (gitignorert) og legges på server-side; de
@@ -71,9 +94,10 @@ Helsesjekk uten auth: `GET /healthz` (kun navn — aldri nøkler).
 - **Bytte av embedding-backend/-modell** endrer vektorrommet: routerens
   persisterte aktivitetsindeks (i integrations-state) må da nullstilles, ellers
   blir likhetssøkene stille dårlige.
-- Claude Code-agenter (jr-dev) snakker Anthropic-formatet (`/v1/messages`) —
-  det oversetter ikke gatewayen. De må mot en Anthropic-kompatibel backend
-  (LM Studio) eller en oversettende proxy (f.eks. LiteLLM) hvis de skal via
-  Aivar.
+- Gatewayen *oversetter ikke* mellom API-formater: Anthropic-formatet
+  (`/v1/messages`) sendes urørt videre og krever en Anthropic-kompatibel
+  upstream (api.anthropic.com — se OAuth-avsnittet — eller LM Studio).
+  Skal Claude Code-agenter via et rent OpenAI-endepunkt (Aivar), trengs en
+  oversettende proxy (f.eks. LiteLLM).
 - Endringer i `routes.json`/`.env` leses ved oppstart — restart gatewayen
   (`docker compose restart`) for å ta dem i bruk.

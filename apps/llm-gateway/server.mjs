@@ -152,6 +152,18 @@ const server = http.createServer(async (req, res) => {
     if (upstream.apiKey) headers['authorization'] = `Bearer ${upstream.apiKey}`
     else delete headers['authorization']
 
+    // appendHeaders (f.eks. anthropic-beta for subscription-OAuth): flettes inn
+    // i klientens eksisterende verdi i stedet for å erstatte den — klienten
+    // eier sin egen feature-liste. Kun for ikke-hemmelige verdier.
+    for (const [name, value] of Object.entries(rule.appendHeaders ?? {})) {
+      const key = name.toLowerCase()
+      const existing = headers[key]
+      if (existing === undefined || existing === '') headers[key] = value
+      else if (!String(existing).split(',').map((s) => s.trim()).includes(value)) {
+        headers[key] = `${existing},${value}`
+      }
+    }
+
     const started = Date.now()
     const upstreamRes = await fetch(upstream.url + req.url, {
       method: req.method,
