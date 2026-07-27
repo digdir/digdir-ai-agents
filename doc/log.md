@@ -6,6 +6,19 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-24** — Junior-agenten containerisert (issue #90): engangs-
+  container per event i stedet for interaktiv CLI på hosten. Runner
+  (`scripts/jr-runner.ps1`, erstatter `junior-agent.ps1`) poller innboksen
+  og kjører `docker run --rm` per event — seriellt innen topic, parallelt
+  på tvers. Workspace og Claude-sesjon per topic
+  (`agents/local-cc-jr-developer/workspaces/<topic>/`, `CLAUDE_CONFIG_DIR`
+  i workspacet, `--resume` på oppfølgingsevents). Eget fine-grained PAT for
+  agenten (Contents+PR RW på arbeidsrepoene, kun i `.env`); monorepo,
+  deploy-klone og `workspaces_repos/` mountes aldri inn. Entrypointet eier
+  resultatlinja (svaret = agentens siste melding — ingen markør-parsing,
+  jf. #83) og KB-læringssteget er tilpasset: commit i mountet `/knowledge`
+  uten push; proxyen pusher ved neste sync.
+
 - **2026-07-22** — PR-prosess (issue #54): plattform-håndhevet skille mellom
   trygge og sensitive endringer. `.github/CODEOWNERS` legger menneskelig
   eier på agent-instrukser, skills, entrypoints, `integrations/src/`,
