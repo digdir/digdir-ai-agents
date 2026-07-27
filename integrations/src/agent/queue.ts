@@ -241,7 +241,7 @@ export class AgentQueue {
       return;
     }
 
-    const delivery = await this.composeDelivery(agent, result);
+    const delivery = await this.composeDelivery(agent, result, reply.kind);
     const posted = await this.post(reply, delivery, posters, result.id);
     if (!posted) return; // Keep pending; the next cycle retries.
     log.info(`Delivered result "${result.id}" to ${reply.kind} as ${delivery.kind} (intent=${result.intent ?? "?"}).`);
@@ -396,9 +396,20 @@ export class AgentQueue {
   }
 
   /** Decides how to deliver a result: a posted message, or a silent ack. */
-  private async composeDelivery(agent: AgentRoute, result: ResultLine): Promise<Delivery> {
+  private async composeDelivery(agent: AgentRoute, result: ResultLine, replyKind: "slack" | "github"): Promise<Delivery> {
+    const extractionFailed = result.extraction_failed === true;
+    const isGithub = replyKind === "github";
+    const isProxy = this.isProxyAgent(agent);
+
     if (result.status !== "ok") {
-      const detail = (result.reply ?? "").trim() || (await this.readLog(agent, result)) || `exit code ${result.exit_code ?? "?"}`;
+      let detail = (result.reply ?? "").trim();
+      // For GitHub delivery of proxy-agent with extraction_failed, use generic warning
+      if (!detail && extractionFailed && isProxy && isGithub) {
+        detail = "Agenten leverte uten strukturert svar — se logg.";
+      } else if (!detail) {
+        // Slack or non-proxy: use raw log fallback
+        detail = (await this.readLog(agent, result)) || `exit code ${result.exit_code ?? "?"}`;
+      }
       return { kind: "message", text: truncate(`⚠️ Agenten feilet (${result.status}).\n\n${detail}`, this.config.maxReplyChars) };
     }
 
@@ -406,9 +417,28 @@ export class AgentQueue {
     if (result.intent === "ack") return { kind: "ack" };
 
     // action / feedback / unknown → post the clean reply, falling back to the
-    // raw log for older results that carry no reply field.
+    // raw log for older results that carry no reply field. For GitHub we do
+    // not expose the internal agent log as a public comment — use a generic
+    // warning instead so transcriptions with internal context are never
+    // posted publicly. Slack keeps the legacy behaviour (raw log is fine in
+    // private channels). When extraction_failed is set, the agent found the
+    // RESULT_MARKER but produced malformed JSON; the raw log almost certainly
+    // contains the full transcription, so we skip it for proxy-agent on GitHub.
     let text = (result.reply ?? "").trim();
-    if (!text) text = (await this.readLog(agent, result)) || "✅ Agenten er ferdig, men produserte ingen tekst.";
+    if (!text) {
+      // For GitHub delivery of proxy-agent with extraction_failed, use generic warning
+      if (extractionFailed && isProxy && isGithub) {
+        text = "⚠️ Agenten leverte uten strukturert svar — se logg.";
+      } else if (!extractionFailed || !isProxy) {
+        // Slack or non-proxy or no extraction failure: use raw log fallback
+        text = await this.readLog(agent, result);
+      }
+      if (!text && extractionFailed && isProxy) {
+        text = "⚠️ Agenten leverte uten strukturert svar — se logg.";
+      } else if (!text) {
+        text = "✅ Agenten er ferdig, men produserte ingen tekst.";
+      }
+    }
     return { kind: "message", text: truncate(text, this.config.maxReplyChars) };
   }
 
@@ -430,6 +460,12 @@ export class AgentQueue {
       log.warn(`Could not read log ${result.log} for "${result.id}".`, err);
       return "";
     }
+  }
+
+  /** Whether the agent's structured result was extracted at all — used to avoid
+   * posting raw internal logs as a public GitHub comment when extraction failed. */
+  private isProxyAgent(agent: AgentRoute): boolean {
+    return agent.name === "proxy-agent";
   }
 
   private async loadOffset(agent: AgentRoute): Promise<number> {
