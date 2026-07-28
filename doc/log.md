@@ -6,6 +6,17 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-28** — PR-prosess (issue #54) sluttført: plattformoppsettet fra
+  [pr-prosess.md](pr-prosess.md) er nå aktivt i produksjon. Branch
+  protection (required approvals 0 + Require review from Code Owners +
+  required check `integrations`) speiler nå **både `v2.0` og `main`** —
+  tidligere kun `v2.0`. `Allow auto-merge` er på og labelen `auto-merge`
+  finnes. Repoet er interaksjonslåst til `collaborators_only`. Dokumentert
+  avvik fra opprinnelig akseptansekriterium: agentene bruker klassisk PAT
+  med `repo`-scope (inkl. Contents) siden fine-grained PAT ikke kan nå
+  org-repoer for en outside collaborator — merge-gaten er branch protection,
+  ikke token-scoping. Fork-basert flyt notert som fremtidig hardening.
+
 - **2026-07-27** — Modell-backend for fat-dev endret (issue #96):
   llm-gatewayen med subscription-OAuth erstatter LM Studio som *første*
   backend i [plans/nvt-agent-integrasjon.md](plans/nvt-agent-integrasjon.md).
