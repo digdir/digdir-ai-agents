@@ -84,6 +84,25 @@ sync_knowledge() {
   fi
 }
 
+# Sikkerhetsnett etter hver kjøring: sync_knowledge pusher bare ved oppstart,
+# og containeren kjører lenge — commits en kjøring etterlater upushet ville
+# ellers blitt liggende lokalt på ubestemt tid. Et skittent arbeidstre betyr
+# at kjøringen hoppet over commit-steget i skillen sin; det kan ikke
+# repareres trygt herfra (vi vet ikke hva som hører sammen), så det varsles.
+knowledge_push_pending() {
+  [[ -n "$KB_GH_TOKEN" && -d "$KNOWLEDGE_DIR/.git" ]] || return 0
+  if [[ -n "$(git -C "$KNOWLEDGE_DIR" status --porcelain 2>/dev/null)" ]]; then
+    log "WARN: kunnskapsbasen har ukommitterte endringer — kjøringen hoppet over commit-steget"
+  fi
+  if [[ -n "$(git -C "$KNOWLEDGE_DIR" log --branches --not --remotes --oneline 2>/dev/null | head -n 1)" ]]; then
+    if git -C "$KNOWLEDGE_DIR" push --quiet 2>/dev/null; then
+      log "Kunnskapsbase: pushet commits som lå igjen lokalt"
+    else
+      log "WARN: Kunnskapsbase: push feilet — nytt forsøk etter neste kjøring"
+    fi
+  fi
+}
+
 # Skills bakt inn i imaget (se Dockerfile). Lastes eksplisitt med --skill
 # siden ~/.pi ligger på et volum som ville skygget image-innhold.
 SKILLS_DIR="${SKILLS_DIR:-/opt/pi-skills}"
@@ -187,6 +206,7 @@ run_synthesis() {
   rc=$?
   set -e
   log "Kunnskapssyntese: ferdig (exit $rc)"
+  knowledge_push_pending
 }
 
 # Kort hint om kunnskapsbasen, kun når den faktisk er tilgjengelig.
@@ -293,6 +313,7 @@ process_event() {
        + (if $extraction_failed == true then {extraction_failed: true} else {} end)' \
     >>"$RESULT_FILE"
   log "Event $id ferdig (exit $exit_code, intent=${intent:-?}, logg: $log_file)"
+  knowledge_push_pending
 }
 
 watch_loop() {
