@@ -1,7 +1,7 @@
 ---
 type: process
 title: PR-prosess — auto-merge på trygge stier, menneske-review på sensitive
-description: Plattform-håndhevet skille mellom trygge endringer (reviewer-subagent + auto-merge) og sensitive endringer (CODEOWNERS krever menneskelig godkjenning). Én agent-identitet, ingen Contents-tilgang for agent-tokens.
+description: Plattform-håndhevet skille mellom trygge endringer (reviewer-subagent + auto-merge) og sensitive endringer (CODEOWNERS krever menneskelig godkjenning). Én agent-identitet; merge-gaten er branch protection/CODEOWNERS, ikke token-scoping (se avvik fra opprinnelig akseptansekriterium).
 timestamp: 2026-07-22T00:00:00Z
 ---
 
@@ -41,10 +41,12 @@ sensitive stier er satt med det i mente.
 4. **Auto-merge via GitHub Action**
    ([`.github/workflows/auto-merge.yml`](../.github/workflows/auto-merge.yml)):
    når en PR får labelen `auto-merge`, slår workflowen på GitHubs native
-   auto-merge med den efemere `GITHUB_TOKEN`. Merging krever Contents write —
-   det har bare workflowen, aldri agent-tokenene. Labelen kan ikke omgå
-   branch protection: rører PR-en en sensitiv sti, venter mergen på code
-   owner uansett.
+   auto-merge med den efemere `GITHUB_TOKEN`. Selve mergen skjer alltid med
+   dette efemere tokenet, aldri med agent-tokenet direkte — men agent-tokenet
+   har i praksis også Contents-scope (se «Avvik fra opprinnelig
+   akseptansekriterium» under). Labelen kan uansett ikke omgå branch
+   protection: rører PR-en en sensitiv sti, venter mergen på code owner
+   uansett, uavhengig av hvilket token som gjør mergen.
 
 ## Prosessen for agentene
 
