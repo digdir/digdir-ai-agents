@@ -1,7 +1,7 @@
 ---
 type: process
 title: PR-prosess — auto-merge på trygge stier, menneske-review på sensitive
-description: Plattform-håndhevet skille mellom trygge endringer (reviewer-subagent + auto-merge) og sensitive endringer (CODEOWNERS krever menneskelig godkjenning). Én agent-identitet, ingen Contents-tilgang for agent-tokens.
+description: Plattform-håndhevet skille mellom trygge endringer (reviewer-subagent + auto-merge) og sensitive endringer (CODEOWNERS krever menneskelig godkjenning). Én agent-identitet; merge-gaten er branch protection/CODEOWNERS, ikke token-scoping (se avvik fra opprinnelig akseptansekriterium).
 timestamp: 2026-07-22T00:00:00Z
 ---
 
@@ -41,10 +41,12 @@ sensitive stier er satt med det i mente.
 4. **Auto-merge via GitHub Action**
    ([`.github/workflows/auto-merge.yml`](../.github/workflows/auto-merge.yml)):
    når en PR får labelen `auto-merge`, slår workflowen på GitHubs native
-   auto-merge med den efemere `GITHUB_TOKEN`. Merging krever Contents write —
-   det har bare workflowen, aldri agent-tokenene. Labelen kan ikke omgå
-   branch protection: rører PR-en en sensitiv sti, venter mergen på code
-   owner uansett.
+   auto-merge med den efemere `GITHUB_TOKEN`. Selve mergen skjer alltid med
+   dette efemere tokenet, aldri med agent-tokenet direkte — men agent-tokenet
+   har i praksis også Contents-scope (se «Avvik fra opprinnelig
+   akseptansekriterium» under). Labelen kan uansett ikke omgå branch
+   protection: rører PR-en en sensitiv sti, venter mergen på code owner
+   uansett, uavhengig av hvilket token som gjør mergen.
 
 ## Prosessen for agentene
 
@@ -60,18 +62,56 @@ Rører PR-en en sensitiv sti er labelen virkningsløs (og bør utelates) —
 pek i stedet på PR-en i svaret til brukeren, som før: mennesket er
 review-gaten.
 
-## Oppsett (repo-admin, gjøres i GitHub UI/API)
+## Oppsett (repo-admin, gjøres i GitHub UI/API) — status: aktivt
 
-Dette kan ikke leveres som filer i repoet:
+Dette kan ikke leveres som filer i repoet. Oppsettet er nå aktivt, speilet
+på **både `v2.0` og `main`**:
 
-1. **Branch protection / ruleset på `v2.0`** (og senere `main`):
+1. **Branch protection / ruleset på `v2.0` og `main`** — samme oppsett på
+   begge:
    - Require a pull request before merging, **required approvals: 0**
    - **Require review from Code Owners: enabled**
    - Required status checks: **`integrations`** (jobben i CI-workflowen)
-2. **Repo-innstilling:** «Allow auto-merge» må være slått på (kreves av
+
+   På `main` biter code owners-kravet først når `.github/CODEOWNERS`
+   faktisk finnes på den branchen — er filen ikke der (f.eks. før første
+   merge fra `v2.0`), håndheves ikke code-owner-skillet der før den er
+   synkronisert inn.
+2. **Repo-innstilling:** «Allow auto-merge» er slått på (kreves av
    `gh pr merge --auto`).
-3. **Label:** opprett `auto-merge` i repoet
-   (`gh label create auto-merge --repo digdir/digdir-ai-agents`).
+3. **Label:** `auto-merge` finnes i repoet.
+4. **Interaksjonslås:** repoet er satt til `collaborators_only` —
+   kun collaborators kan kommentere på eller åpne issues og PR-er. Dette er
+   uavhengig av branch protection/CODEOWNERS, men del av samme
+   sikkerhetsoppsett: det begrenser hvem som i utgangspunktet kan skape
+   innhold agentene reagerer på.
+
+## Avvik fra opprinnelig akseptansekriterium
+
+Det opprinnelige akseptansekriteriet «ingen agent-tokens har fått
+Contents-tilgang» er **ikke** oppfylt slik det ble formulert: kodeagentene
+bruker i dag ett **klassisk PAT med `repo`-scope** (inkludert Contents), ikke
+et fine-grained PAT begrenset til PR/Issues. Årsak: et fine-grained PAT kan
+strukturelt ikke nå org-repoer for en outside collaborator (GitHub tillater
+ikke fine-grained access til org-repoer for kontoer uten org-medlemskap) —
+alternativet var enten organisasjonsmedlemskap for bot-kontoen (større
+blast radius) eller klassisk PAT.
+
+Merge-gaten er derfor **branch protection + CODEOWNERS**, ikke
+token-scoping: agent-tokenet kan teknisk sett skrive Contents, men kan ikke
+omgå required review from Code Owners på sensitive stier, og kan ikke sette
+`auto-merge`-labelen forbi branch protection på ikke-sensitive stier heller
+(labelen trigger kun workflowen — selve mergen skjer med den efemere
+`GITHUB_TOKEN`, se punkt 4 i mekanikken ovenfor). Restrisikoen er dermed at
+et kompromittert agent-token kan pushe/force-pushe direkte til andre
+branches enn de beskyttede — ikke at det kan omgå review-prosessen på
+`v2.0`/`main`.
+
+**Fremtidig hardening:** en fork-basert flyt (agenten jobber i en fork,
+åpner PR mot upstream) ville fjernet behovet for at agent-tokenet har
+Contents-tilgang til hoved-repoet i det hele tatt. Ikke implementert ennå —
+notert som neste steg for å faktisk lukke det opprinnelige
+akseptansekriteriet.
 
 ## Grenser og videre
 
@@ -80,3 +120,5 @@ Dette kan ikke leveres som filer i repoet:
 - Merges gjort av `GITHUB_TOKEN` trigger ikke andre workflows — irrelevant
   her, siden deploy er polling-basert (self-update-watcheren), ikke en
   Action.
+- Fork-basert flyt for agent-PR-er (se avviket ovenfor) er fremtidig
+  hardening, ikke implementert.
