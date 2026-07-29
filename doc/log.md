@@ -6,6 +6,28 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-29** — nvt M1-kjernen (issue #97): ny app
+  [`apps/nvt-bridge/`](../apps/nvt-bridge/) og ny agentkatalog
+  [`agents/nvt-fat-developer/`](../agents/nvt-fat-developer/) bak uendret
+  filkontrakt, jf. [plans/nvt-agent-integrasjon.md](plans/nvt-agent-integrasjon.md).
+  Broen er deterministisk kode uten LLM: samme dedupe-regel som resten av
+  pipelinen (id uten linje i `results.jsonl`), topic =
+  `payload.origin.event_id` uten delta-suffiks, topic→instans i
+  `state/topics.json`, serielt per topic og parallelt på tvers (maks N), og
+  TTL-basert `agent-down` som beholder workspacet. Kommer `agentdctl signal
+  done` uten resultatlinje — eller ingenting innen fristen — skriver broen en
+  `status:"error"`-linje med forklaring; en `status:"ok"` kan bare komme fra
+  agenten selv. All nvt-interaksjon ligger bak et interface med
+  fake-implementasjon for tester; den ekte adapteren (`src/nvt/docker.ts`) er
+  merket «kalibreres mot M0-funn» (#96) og er det eneste stedet antakelser om
+  compose-stier og containernavn bor. 62 tester dekker dedupe,
+  topic-avledning, serialisering per topic og fallback-linja. Instruks-malen
+  for instansens `AGENTS.local.md` gjenbruker kodeagent-protokollen ordrett,
+  men uten innboks-polling og med `agentdctl signal done` etter resultatlinja.
+  `integrations/src/` er urørt — ruta i `AGENT_ROUTES` er driftskonfig som tas
+  ved utrulling. M1 lukkes først etter E2E-verifisering mot ekte
+  nvt-instanser.
+
 - **2026-07-28** — PR-prosess (issue #54) sluttført: plattformoppsettet fra
   [pr-prosess.md](pr-prosess.md) er nå aktivt i produksjon. Branch
   protection (required approvals 0 + Require review from Code Owners +
