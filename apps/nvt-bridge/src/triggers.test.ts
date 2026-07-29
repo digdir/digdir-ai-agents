@@ -101,6 +101,46 @@ test("hasResult ser linjer skrevet av agenten i instansen", async () => {
   assert.equal(await triggers.hasResult("a"), true);
 });
 
+test("manglende linjeskift fra agenten repareres før vår linje skrives", async () => {
+  // Regresjon: agenten skriver resultatlinja frihånds. Uten linjeskift ville
+  // vår append havnet på slutten av dens linje og gjort BEGGE uleselige —
+  // eventet ville stått ubehandlet for alltid.
+  const triggers = await tempTriggers();
+  const { writeFile, readFile } = await import("node:fs/promises");
+  await writeFile(triggers.resultsFile, JSON.stringify({ id: "a", status: "ok" }), "utf8");
+
+  await triggers.appendResult({ id: "b", status: "error" });
+
+  const lines = (await readFile(triggers.resultsFile, "utf8")).trimEnd().split("\n");
+  assert.equal(lines.length, 2);
+  assert.deepEqual(
+    lines.map((l) => (JSON.parse(l) as { id: string }).id),
+    ["a", "b"],
+  );
+});
+
+test("log-stien saneres — en id med ../ skriver ikke utenfor triggers/", async () => {
+  const triggers = await tempTriggers();
+  const rel = triggers.bridgeLogRelPath("slack-C1/../../../etc-x");
+  assert.equal(rel, "logs/slack-C1_.._.._.._etc-x.bridge.log");
+  assert.ok(!rel.includes("/../"), "ingen sti-escape");
+  // integrations avviser log-verdier utenfor agentens triggers-katalog.
+  assert.ok(rel.startsWith("logs/"));
+
+  await triggers.appendBridgeLog("slack-C1/../../../etc-x", "hei");
+  const { readFile } = await import("node:fs/promises");
+  const written = await readFile(path.join(triggers.triggersDir, rel), "utf8");
+  assert.match(written, /hei/);
+});
+
+test("en feilende bridge-logg kaster ikke (resultatlinja er viktigere)", async () => {
+  // logs/ er en FIL, ikke en katalog → ENOTDIR ved skriving.
+  const dir = await mkdtemp(path.join(tmpdir(), "nvt-bridge-log-"));
+  await writeFile(path.join(dir, "logs"), "blokkerer", "utf8");
+  const triggers = new TriggerFiles(dir);
+  await assert.doesNotReject(() => triggers.appendBridgeLog("e1", "hei"));
+});
+
 test("bridge-loggen har eget suffiks så den ikke kolliderer med agentens logg", async () => {
   const triggers = await tempTriggers();
   assert.equal(triggers.bridgeLogRelPath("evt-1"), "logs/evt-1.bridge.log");

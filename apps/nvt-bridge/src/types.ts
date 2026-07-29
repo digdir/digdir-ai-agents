@@ -50,6 +50,12 @@ export interface TopicRecord {
   last_prompt_at?: string;
   /** Siste event-id bridgen dispatchet for dette topicet. */
   last_event_id?: string;
+  /**
+   * Event-id som er injisert men ennå ikke kvittert ut med en resultatlinje.
+   * Overlever en omstart av bridgen, slik at den ikke sender samme prompt inn
+   * i en levende sesjon to ganger.
+   */
+  in_flight_event_id?: string;
   /** Antall prompts injisert i denne sesjonen. */
   prompts: number;
   /** Om bridgen tror instansen er oppe. `agent-down` setter denne til false. */

@@ -20,7 +20,7 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
   agenten selv. All nvt-interaksjon ligger bak et interface med
   fake-implementasjon for tester; den ekte adapteren (`src/nvt/docker.ts`) er
   merket «kalibreres mot M0-funn» (#96) og er det eneste stedet antakelser om
-  compose-stier og containernavn bor. 62 tester dekker dedupe,
+  compose-stier og containernavn bor. 77 tester dekker dedupe,
   topic-avledning, serialisering per topic og fallback-linja. Instruks-malen
   for instansens `AGENTS.local.md` gjenbruker kodeagent-protokollen ordrett,
   men uten innboks-polling og med `agentdctl signal done` etter resultatlinja.

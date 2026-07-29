@@ -38,6 +38,7 @@ const bridge = new NvtBridge({
   promptTimeoutMs: config.promptTimeoutMs,
   resultGraceMs: config.resultGraceMs,
   idleTtlMs: config.idleTtlMs,
+  instanceTriggersPath: config.instanceTriggersPath,
   log,
 });
 

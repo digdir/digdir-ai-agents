@@ -19,6 +19,8 @@ export interface BridgeOptions {
   resultGraceMs: number;
   /** TTL for `agent-down` av inaktive topics. 0 = av. */
   idleTtlMs: number;
+  /** Hvor agentens `triggers/` er mountet inne i instansen. Default `/triggers`. */
+  instanceTriggersPath?: string;
   log?: (message: string) => void;
   /** Injiserbar for tester. */
   sleep?: (ms: number) => Promise<void>;
@@ -86,8 +88,33 @@ export class NvtBridge {
         // En feilende pollesyklus skal ikke drepe brua.
         this.log(`pollesyklus feilet: ${describe(err)}`);
       }
-      await this.sleep(pollMs);
+      await this.sleepUntil(pollMs, signal);
     }
+    // Avslutt ryddig: la events som er under arbeid få skrevet resultatlinja
+    // si. Ellers ville de stått uten linje, og neste bridge-prosess måtte
+    // rapportere dem som ukjent utfall.
+    if (this.scheduler.activeTopics() > 0 || this.scheduler.queuedCount() > 0) {
+      this.log(
+        `venter på ${this.scheduler.activeTopics()} aktive topics før avslutning ` +
+          `(${this.scheduler.queuedCount()} i kø)`,
+      );
+      await this.scheduler.idle();
+    }
+    this.log("avsluttet");
+  }
+
+  /** Som `sleep`, men våkner umiddelbart ved abort. */
+  private async sleepUntil(ms: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return;
+    if (!signal) return this.sleep(ms);
+    await new Promise<void>((resolve) => {
+      const onAbort = () => resolve();
+      signal.addEventListener("abort", onAbort, { once: true });
+      void this.sleep(ms).then(() => {
+        signal.removeEventListener("abort", onAbort);
+        resolve();
+      });
+    });
   }
 
   /**
@@ -97,12 +124,21 @@ export class NvtBridge {
   private async handleEvent(event: QueueEvent, topic: string): Promise<void> {
     const started_at = new Date().toISOString();
     const instanceName = instanceNameFor(topic, this.opts.instanceNaming);
-    await this.opts.triggers.appendBridgeLog(
-      event.id,
-      `dispatch: topic=${topic} instans=${instanceName}`,
-    );
 
     try {
+      // Loggingen er best effort og ligger inne i try-en: ingenting utenfor
+      // den får stå mellom «vi har tatt eventet» og «det finnes en
+      // resultatlinje».
+      await this.opts.triggers.appendBridgeLog(
+        event.id,
+        `dispatch: topic=${topic} instans=${instanceName}`,
+      );
+
+      // Var eventet allerede injisert av en tidligere bridge-prosess? Da skal
+      // det IKKE promptes på nytt — det ville lagt en andre prompt inn i en
+      // levende sesjon som kanskje står midt i arbeidet.
+      if (await this.recoverInFlight(event, topic, started_at)) return;
+
       await this.opts.store.upsert(topic, instanceName);
       const record = this.opts.store.get(topic);
       // State er sannheten når den finnes: et topic som allerede har en
@@ -113,8 +149,13 @@ export class NvtBridge {
       const ref = await this.opts.driver.ensureInstance(topic, instance);
       this.log(`topic ${topic}: instans ${instance} klar, injiserer event ${event.id}`);
 
-      await this.opts.driver.sendPrompt(ref, renderPrompt(event, topic));
+      // Markeres FØR prompten sendes: krasjer bridgen mellom disse to, må
+      // gjenopptakelsen anta at prompten kan ha nådd sesjonen.
       await this.opts.store.markPrompted(topic, event.id);
+      await this.opts.driver.sendPrompt(
+        ref,
+        renderPrompt(event, topic, this.opts.instanceTriggersPath ?? "/triggers"),
+      );
       await this.opts.triggers.appendBridgeLog(event.id, "prompt injisert, venter på signal done");
 
       const outcome = await this.opts.driver.waitForDone(ref, {
@@ -134,6 +175,7 @@ export class NvtBridge {
 
       if (await this.awaitResultLine(event.id, graceMs)) {
         this.log(`topic ${topic}: event ${event.id} kvittert ut av agenten`);
+        await this.opts.store.markSettled(topic, event.id);
         await this.opts.triggers.appendBridgeLog(event.id, "resultatlinje fra agenten funnet");
         return;
       }
@@ -142,9 +184,15 @@ export class NvtBridge {
       await this.writeFallback(event, topic, instance, started_at, reason);
     } catch (err) {
       // Interne feil (instans nede, make/docker feilet) skal også ende i en
-      // resultatlinje — ellers spinner polleren på eventet for alltid.
-      await this.opts.triggers.appendBridgeLog(event.id, `intern feil: ${describe(err)}`);
-      if (!(await this.opts.triggers.hasResult(event.id))) {
+      // resultatlinje — ellers spinner polleren på eventet for alltid. Derfor
+      // skrives linja FØRST her; logging og state-rydding er best effort etterpå.
+      let already = false;
+      try {
+        already = await this.opts.triggers.hasResult(event.id);
+      } catch {
+        // Kan vi ikke lese resultatfila, heller en mulig dublett enn et tapt svar.
+      }
+      if (!already) {
         await this.opts.triggers.appendResult({
           id: event.id,
           status: "error",
@@ -158,6 +206,60 @@ export class NvtBridge {
           finished_at: new Date().toISOString(),
         });
       }
+      await this.settleQuietly(topic, event.id);
+      await this.opts.triggers.appendBridgeLog(event.id, `intern feil: ${describe(err)}`);
+    }
+  }
+
+  /**
+   * Gjenopptakelse etter omstart: et event som state sier allerede er injisert
+   * skal ikke promptes på nytt. Vi venter nådefristen på at agenten (som kan
+   * være midt i arbeidet i en fortsatt levende sesjon) skriver resultatlinja,
+   * og melder ellers ærlig at utfallet er ukjent.
+   *
+   * Returnerer true når eventet er håndtert her.
+   */
+  private async recoverInFlight(
+    event: QueueEvent,
+    topic: string,
+    started_at: string,
+  ): Promise<boolean> {
+    const record = this.opts.store.get(topic);
+    if (record?.in_flight_event_id !== event.id) return false;
+
+    this.log(
+      `topic ${topic}: event ${event.id} var allerede injisert før omstart — prompter ikke på nytt`,
+    );
+    if (await this.awaitResultLine(event.id, this.opts.resultGraceMs)) {
+      await this.opts.store.markSettled(topic, event.id);
+      await this.opts.triggers.appendBridgeLog(event.id, "resultatlinje funnet etter omstart");
+      return true;
+    }
+    await this.opts.triggers.appendResult({
+      id: event.id,
+      status: "error",
+      exit_code: 1,
+      log: this.opts.triggers.bridgeLogRelPath(event.id),
+      intent: "action",
+      reply:
+        `nvt-broen ble startet på nytt mens denne oppgaven var under arbeid i instansen ` +
+        `\`${record.instance}\`. Oppgaven ble ikke sendt inn igjen (det ville lagt en ny ` +
+        `prompt inn i en levende sesjon), og broen kan ikke bekrefte utfallet. Sjekk ` +
+        `code-server på http://${record.instance}.agent.localhost:4090 — arbeidet kan ` +
+        `ligge der. Topic \`${topic}\`.`,
+      started_at,
+      finished_at: new Date().toISOString(),
+    });
+    await this.settleQuietly(topic, event.id);
+    this.log(`topic ${topic}: event ${event.id} → fallback-resultatlinje (bridge-omstart)`);
+    return true;
+  }
+
+  private async settleQuietly(topic: string, eventId: string): Promise<void> {
+    try {
+      await this.opts.store.markSettled(topic, eventId);
+    } catch {
+      // State er gjenskapbar; en feil her skal ikke velte behandlingen.
     }
   }
 
@@ -185,6 +287,7 @@ export class NvtBridge {
       started_at,
       finished_at: new Date().toISOString(),
     });
+    await this.settleQuietly(topic, event.id);
     this.log(`topic ${topic}: event ${event.id} → fallback-resultatlinje (${reason})`);
     await this.opts.triggers.appendBridgeLog(event.id, `fallback-resultatlinje skrevet (${reason})`);
   }
@@ -195,7 +298,9 @@ export class NvtBridge {
    * der både agenten og broen skriver en linje for samme id.
    */
   private async awaitResultLine(id: string, graceMs: number): Promise<boolean> {
-    const step = 500;
+    // 1s: hvert forsøk leser hele results.jsonl, så tettere polling koster mer
+    // enn den vinner.
+    const step = 1000;
     let waited = 0;
     for (;;) {
       if (await this.opts.triggers.hasResult(id)) return true;

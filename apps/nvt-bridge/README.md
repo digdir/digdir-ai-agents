@@ -48,11 +48,29 @@ Agenten skriver resultatlinja selv. Broen skriver **kun** `status:"error"`:
 | `signal done` uten resultatlinje innen nådefristen | `status:"error"` med forklaring |
 | Verken resultatlinje eller `signal done` innen timeout | `status:"error"` med forklaring |
 | Intern feil (instans nede, `make`/`docker` feilet) | `status:"error"` med feilmeldingen |
+| Broen ble startet på nytt mens eventet var under arbeid | `status:"error"` — prompten sendes **ikke** inn igjen |
 
 En `status:"ok"` kan altså bare komme fra agenten. At *hvert* dispatchet event
 ender med en resultatlinje er en invariant: uten den ville eventet være evig
 ubehandlet, og polleren dispatche det på nytt i ring (samme grunn som
-agent-entrypointene har en EXIT-trap).
+agent-entrypointene har en EXIT-trap). Derfor er også bridge-loggen best
+effort — den skal aldri kunne stå i veien for resultatlinja.
+
+Kjent restrisiko: kommer agentens linje i akkurat samme øyeblikk som
+nådefristen løper ut, kan begge linjene bli skrevet. Integrations tar den
+første og hopper over den andre, så utfallet kan bli «agenten lyktes, men
+brukeren fikk feilmeldingen». Vinduet er smalt (broen sjekker på nytt rett før
+den skriver), men det er ikke null.
+
+### Omstart midt i en oppgave
+
+Injiserte events markeres i `state/topics.json` (`in_flight_event_id`) før
+prompten sendes. Starter broen på nytt før eventet er kvittert ut, sendes
+prompten **ikke** inn igjen — en andre prompt inn i en levende sesjon som står
+midt i arbeidet ville vært verre enn et ærlig «ukjent utfall». Broen venter
+nådefristen på at agenten skriver linja selv, og melder ellers feil med peker
+til instansen. Ved `SIGTERM`/`SIGINT` avslutter broen først når events under
+arbeid har fått skrevet resultatlinja si.
 
 ## Oppstart
 

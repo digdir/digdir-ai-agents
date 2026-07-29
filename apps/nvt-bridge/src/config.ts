@@ -12,6 +12,8 @@ export interface BridgeConfig {
   nvtRoot: string;
   agentType: string;
   instanceNaming: InstanceNameOptions;
+  /** Hvor agentens triggers/ er mountet inne i instansen. */
+  instanceTriggersPath: string;
   dryRun: boolean;
 }
 
@@ -44,6 +46,7 @@ export function loadConfig(
       intFrom(env.NVT_BRIDGE_IDLE_TTL_MINUTES, 180, "NVT_BRIDGE_IDLE_TTL_MINUTES", 0) * 60_000,
     nvtRoot,
     agentType: (env.NVT_AGENT_TYPE ?? "claude").trim(),
+    instanceTriggersPath: (env.NVT_INSTANCE_TRIGGERS_PATH ?? "/triggers").trim(),
     instanceNaming: {
       prefix: (env.NVT_INSTANCE_PREFIX ?? "fatdev").trim(),
       maxLength: intFrom(env.NVT_INSTANCE_NAME_MAX, 40, "NVT_INSTANCE_NAME_MAX", 16),

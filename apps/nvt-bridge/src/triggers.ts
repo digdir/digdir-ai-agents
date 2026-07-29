@@ -1,5 +1,6 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile } from "node:fs/promises";
 import path from "node:path";
+import { safeId } from "./topic.ts";
 import type { QueueEvent, ResultLine } from "./types.ts";
 
 /**
@@ -81,28 +82,69 @@ export class TriggerFiles {
     return (await this.readResultIds()).has(id);
   }
 
-  /** Skriver én resultatlinje. Valgfrie felter med tom verdi utelates. */
+  /**
+   * Skriver én resultatlinje.
+   *
+   * Agenten inne i instansen skriver til samme fil, og den skriver linja
+   * frihånds (i motsetning til entrypointene, som bygger den med jq). Glemmer
+   * den linjeskiftet, ville vår append havnet på slutten av *dens* linje og
+   * gjort begge uleselige — integrations ville da hoppet over hele linja, og
+   * eventet blitt evig ubehandlet. Vi reparerer derfor et manglende linjeskift
+   * før vi skriver.
+   */
   async appendResult(line: ResultLine): Promise<void> {
-    await appendFile(this.resultsFile, JSON.stringify(line) + "\n", "utf8");
+    const prefix = (await this.endsWithNewline()) ? "" : "\n";
+    await appendFile(this.resultsFile, prefix + JSON.stringify(line) + "\n", "utf8");
   }
 
-  /** Sti til bridgens egen logg for et event, relativt til triggers-dir. */
+  /** Slutter results.jsonl med linjeskift? (Tom/manglende fil regnes som ja.) */
+  private async endsWithNewline(): Promise<boolean> {
+    let handle;
+    try {
+      handle = await open(this.resultsFile, "r");
+      const { size } = await handle.stat();
+      if (size === 0) return true;
+      const buf = Buffer.alloc(1);
+      await handle.read(buf, 0, 1, size - 1);
+      return buf[0] === 0x0a;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return true;
+      throw err;
+    } finally {
+      await handle?.close();
+    }
+  }
+
+  /**
+   * Sti til bridgens egen logg for et event, relativt til triggers-dir.
+   *
+   * Id-en saneres: integrations krever at `log` peker innenfor agentens egen
+   * triggers-katalog, og en id med `/` eller `..` ville både gitt en ugyldig
+   * `log`-verdi og fått `appendBridgeLog` til å skrive utenfor katalogen.
+   */
   bridgeLogRelPath(id: string): string {
-    return path.posix.join("logs", `${id}.bridge.log`);
+    return path.posix.join("logs", `${safeId(id)}.bridge.log`);
   }
 
   /**
    * Append til bridgens egen logg for et event. Egen filnavn-suffiks
    * (`.bridge.log`) fordi agenten inne i instansen skriver `logs/<id>.log`
    * selv — de to skal ikke kollidere.
+   *
+   * Best effort: loggen er diagnostikk. En feil her skal ALDRI hindre at
+   * resultatlinja blir skrevet — uten den er eventet evig ubehandlet.
    */
   async appendBridgeLog(id: string, message: string): Promise<void> {
     const stamp = new Date().toISOString();
-    await appendFile(
-      path.join(this.triggersDir, this.bridgeLogRelPath(id)),
-      `[${stamp}] ${message}\n`,
-      "utf8",
-    );
+    try {
+      await appendFile(
+        path.join(this.triggersDir, this.bridgeLogRelPath(id)),
+        `[${stamp}] ${message}\n`,
+        "utf8",
+      );
+    } catch {
+      // Ignorert med vilje — se over.
+    }
   }
 }
 

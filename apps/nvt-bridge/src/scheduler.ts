@@ -76,7 +76,9 @@ export class TopicScheduler {
       if (this.active.size >= this.opts.maxParallel) break;
       if (this.active.has(topic) || queue.length === 0) continue;
       this.active.add(topic);
-      void this.runTopic(topic);
+      // `runTopic` fanger selv feil fra handleren; denne catch-en er en siste
+      // skanse mot unhandled rejection (f.eks. om `onError` selv kaster).
+      void this.runTopic(topic).catch(() => {});
     }
   }
 

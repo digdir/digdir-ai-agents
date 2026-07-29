@@ -64,8 +64,20 @@ export class TopicStore {
     if (!record) return;
     record.last_prompt_at = new Date().toISOString();
     record.last_event_id = eventId;
+    record.in_flight_event_id = eventId;
     record.prompts += 1;
     record.up = true;
+    await this.save();
+  }
+
+  /**
+   * Eventet er kvittert ut (av agenten eller av en fallback-linje). Rydder
+   * in-flight-markøren, så en senere omstart ikke tror det står ubehandlet.
+   */
+  async markSettled(topic: string, eventId: string): Promise<void> {
+    const record = this.state.topics[topic];
+    if (!record || record.in_flight_event_id !== eventId) return;
+    delete record.in_flight_event_id;
     await this.save();
   }
 
