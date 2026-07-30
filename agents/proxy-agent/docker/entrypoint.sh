@@ -227,13 +227,31 @@ build_prompt() {
   fi
 }
 
+# Reparasjonspass for nesten-JSON (#104): den lokale modellen glipper noen
+# ganger på anførselstegn rundt feltskillet — "," (mellom to strengfelt) eller
+# ":" (mellom nøkkel og verdi) kommer ut med en apostrof i stedet for et
+# anførselstegn. Disse to erstatningene er snevre og målrettede — kun de to
+# kjente glippene — IKKE en generell anførselstegn-erstatning som kunne
+# ødelagt tekst inni selve strengverdiene. Håndterer i tillegg at hele blokken
+# er pakket i en kodefence uten at fence-linjen står helt for seg selv (#83):
+# en ledende ```json limt inntil JSON-en, eller en avsluttende ``` limt rett
+# etter siste "}".
+repair_near_json() {
+  local s="$1"
+  s=$(printf '%s' "$s" | sed -E '1s/^```[a-zA-Z]*[[:space:]]*//')
+  s=$(printf '%s' "$s" | sed -E '$s/```+[[:space:]]*$//')
+  s=$(printf '%s' "$s" | sed -e "s/','/\", \"/g")
+  s=$(printf '%s' "$s" | sed -e "s/\":'/\": \"/g")
+  printf '%s' "$s"
+}
+
 # Extracts the JSON block the agent printed after RESULT_MARKER (everything
 # after the last marker line). Handles markdown fences the LLM sometimes wraps
 # the result in (```json ... ```), which would otherwise make jq reject it.
 # Logs a WARN when the marker is found but extraction still fails — so we do
 # not silently drop delegations.
 extract_result_json() {
-  local log_file="$1" block has_marker=false
+  local log_file="$1" block has_marker=false repaired
   # Check whether the marker exists at all, so we can warn on malformed output.
   if grep -q "^${RESULT_MARKER}$" "$log_file"; then
     has_marker=true
@@ -250,9 +268,21 @@ extract_result_json() {
     return 0
   fi
 
-  # Marker funnet, men vi klarte ikke parse JSON-en. Logg en WARN slik at
-  # delegeringen ikke går tapt stille — broen får en generisk feilmelding i
-  # stedet for å poste hele agentloggen som offentlig GitHub-kommentar.
+  # Direkte parsing feilet. Prøv reparasjonspasset (#104) før vi gir opp — det
+  # rører aldri en blokk som allerede var gyldig JSON, siden vi bare når hit
+  # når jq-sjekken over allerede har feilet.
+  if [[ -n "$block" ]]; then
+    repaired=$(repair_near_json "$block")
+    if [[ "$repaired" != "$block" ]] && jq -e 'if type == "object" then . else error("not an object") end' >/dev/null 2>&1 <<<"$repaired"; then
+      printf '%s' "$repaired"
+      return 0
+    fi
+  fi
+
+  # Marker funnet, men vi klarte ikke parse JSON-en (heller ikke etter
+  # reparasjonspasset). Logg en WARN slik at delegeringen ikke går tapt
+  # stille — broen får en generisk feilmelding i stedet for å poste hele
+  # agentloggen som offentlig GitHub-kommentar.
   if [[ "$has_marker" == true ]]; then
     printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "WARN: AGENT-RESULT-blokk funnet, men ugyldig JSON — delegering tapt. Fikk:${#block} tegn." >&2
   fi
@@ -276,8 +306,6 @@ process_event() {
   exit_code=$?
   set -e
 
-  finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-
   # Pull the agent's classification (intent + reply + evt. delegate) out of
   # the log, if present. extract_result_json may return non-zero when the
   # RESULT_MARKER is found but the JSON block is malformed — we catch that so
@@ -286,6 +314,31 @@ process_event() {
   set +e
   result_json=$(extract_result_json "$log_file") || extraction_failed=true
   set -e
+
+  # Automatisk retry (#104): første forsøk feilet enten med ugyldig JSON etter
+  # markøren (anførselstegn-glipp), eller markøren manglet helt (#97). Gi
+  # modellen ÉN ny sjanse med samme prompt + et kort notat om hva som gikk
+  # galt, før vi faller gjennom til eksisterende #91-fallback.
+  if [[ "$extraction_failed" == true ]]; then
+    log "Event $id: AGENT-RESULT mangler eller er ugyldig JSON — prøver ett automatisk retry-forsøk."
+    local retry_prompt
+    retry_prompt=$(printf '%s\n\n---\nMERK: forrige svaret ditt ble avvist av broen — enten manglet linjen "%s" helt, eller JSON-objektet etter den var ugyldig (f.eks. feil anførselstegn rundt et felt-skille, eller hele objektet pakket i en kodefence). Gjenta oppgaven på nytt og avslutt garantert med en egen linje med kun teksten "%s", etterfulgt av ett gyldig, rått JSON-objekt uten kodefence.\n' \
+      "$prompt" "$RESULT_MARKER" "$RESULT_MARKER")
+    printf '\n[%s] --- RETRY (#104): forrige AGENT-RESULT var ugyldig/manglet ---\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$log_file"
+    set +e
+    pi "${pi_args[@]}" "$retry_prompt" >>"$log_file" 2>&1
+    exit_code=$?
+    set -e
+    extraction_failed=false
+    set +e
+    result_json=$(extract_result_json "$log_file") || extraction_failed=true
+    set -e
+    if [[ "$extraction_failed" == false ]]; then
+      log "Event $id: retry ga gyldig AGENT-RESULT."
+    fi
+  fi
+
+  finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   if [[ -n "$result_json" ]]; then
     intent=$(jq -r '.intent // empty' <<<"$result_json")
