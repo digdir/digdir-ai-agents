@@ -24,14 +24,13 @@ assert_valid_json() {
 }
 
 assert_extract_fails() {
-  local name="$1" log_file="$2"
-  if extract_result_json "$log_file" >/tmp/out.$$ 2>/dev/null; then
-    echo "FAIL $name (forventet feil, fikk: $(cat /tmp/out.$$))"
+  local name="$1" log_file="$2" out
+  if out=$(extract_result_json "$log_file" 2>/dev/null); then
+    echo "FAIL $name (forventet feil, fikk: $out)"
     failures=$((failures + 1))
   else
     echo "OK   $name"
   fi
-  rm -f /tmp/out.$$
 }
 
 assert_extract_ok() {
