@@ -12,6 +12,22 @@ STATE_FILE="${STATE_FILE:-/triggers/.state}"
 POLL_INTERVAL="${POLL_INTERVAL:-5}"
 PI_MODEL="${PI_MODEL:-}"
 
+# Løkkevakt + backstop (#112): en pi-kjøring kjørte 1972 ganger på rad samme
+# verktøykall med gyldig svar hver gang — ingen feil å reagere på, så vanlig
+# feilhåndtering fanger den ikke. To uavhengige vern rundt hvert pi-kall:
+#   1. Løkkevakt (primær) — se detect_loop(): glidende vindu over de siste
+#      LOOP_DETECTOR_WINDOW verktøykallene fra sesjonsfila; >=
+#      LOOP_DETECTOR_THRESHOLD identiske => løkke.
+#   2. Backstop-timeout (sekundær) — PI_MAX_DURATION er en svært romslig
+#      absolutt makstid som fanger patologier løkkevakta ikke ser.
+# Begge dreper kun pi-prosessen (aldri containeren); process_event sin vanlige
+# opprydding (knowledge_push_pending m.m.) kjører uendret etterpå.
+PI_MAX_DURATION="${PI_MAX_DURATION:-7200}"
+LOOP_DETECTOR_WINDOW="${LOOP_DETECTOR_WINDOW:-10}"
+LOOP_DETECTOR_THRESHOLD="${LOOP_DETECTOR_THRESHOLD:-5}"
+LOOP_DETECTOR_INTERVAL="${LOOP_DETECTOR_INTERVAL:-60}"
+PI_SESSIONS_DIR="${PI_SESSIONS_DIR:-$HOME/.pi/agent/sessions}"
+
 # Lokalt/OpenAI-kompatibelt LLM-endepunkt (f.eks. Envoy AI Gateway på hosten).
 # Settes LLM_BASE_URL genereres ~/.pi/agent/models.json ved oppstart, og
 # LLM_MODEL_ID brukes som default modell (med mindre PI_MODEL overstyrer).
@@ -290,8 +306,107 @@ extract_result_json() {
   return 1
 }
 
+# Nyeste sesjonsfil under PI_SESSIONS_DIR (pi appender denne live, i
+# motsetning til loggfila til eventet som forblir 0 bytes til pi er ferdig —
+# derfor må løkkevakta lese sesjonsfila, ikke loggen, se #112).
+find_latest_session_file() {
+  [[ -d "$PI_SESSIONS_DIR" ]] || return 0
+  find "$PI_SESSIONS_DIR" -type f -name '*.jsonl' -printf '%T@ %p\n' 2>/dev/null \
+    | sort -rn \
+    | head -n1 \
+    | cut -d' ' -f2-
+}
+
+# Trekker ut verktøykall (navn + argumenter) fra en pi-sesjonsfil (JSONL med
+# message-objekter; assistant-meldinger har et toolCall-felt med "name" +
+# "arguments" — enten som ett objekt eller en liste). Returnerer ett kanonisk
+# JSON-objekt per linje, kun de siste $2.
+recent_tool_calls() {
+  local session_file="$1" window="$2"
+  jq -c '
+    (.message.toolCall // empty) as $tc
+    | if $tc == null then empty
+      elif ($tc | type) == "array" then $tc[] | {name, arguments}
+      else {name: $tc.name, arguments: $tc.arguments}
+      end
+  ' "$session_file" 2>/dev/null | tail -n "$window"
+}
+
+# Deteksjonsregel besluttet 2026-07-30 (#112): glidende vindu over de siste
+# LOOP_DETECTOR_WINDOW verktøykallene — hvis LOOP_DETECTOR_THRESHOLD eller
+# flere er identiske (samme verktøy + samme argumenter), er dette en
+# degenerert løkke. Vindusvarianten fanger også vekslende løkker
+# (A-B-A-B-...), ikke bare rene repetisjoner. Setter LOOP_DETECTOR_MESSAGE ved
+# treff.
+detect_loop() {
+  local session_file="$1" calls total top_count
+  calls=$(recent_tool_calls "$session_file" "$LOOP_DETECTOR_WINDOW")
+  [[ -n "$calls" ]] || return 1
+  total=$(printf '%s\n' "$calls" | grep -c .)
+  top_count=$(printf '%s\n' "$calls" | sort | uniq -c | sort -rn | head -n1 | awk '{print $1}')
+  [[ "$top_count" =~ ^[0-9]+$ ]] || return 1
+  if (( top_count >= LOOP_DETECTOR_THRESHOLD )); then
+    LOOP_DETECTOR_MESSAGE="løkke detektert: samme verktøykall x ${top_count} av siste ${total}"
+    return 0
+  fi
+  return 1
+}
+
+# Kjører pi i bakgrunnen under oppsyn av løkkevakt + backstop-timeout.
+# $3 (valgfritt) = "append" for å skrive til $log_file med >> (brukt av
+# #104-retry-forsøket), ellers overskrives loggfila som normalt.
+# Setter PI_GUARD_REASON ved drept prosess (tom = pi fullførte selv);
+# returnerer pi sin exit-kode (eller signalets ved drept prosess).
+run_pi_supervised() {
+  local log_file="$1" prompt="$2" mode="${3:-truncate}"
+  local pi_pid start_ts last_check now session_file
+  PI_GUARD_REASON=""
+  if [[ "$mode" == append ]]; then
+    pi "${pi_args[@]}" "$prompt" >>"$log_file" 2>&1 &
+  else
+    pi "${pi_args[@]}" "$prompt" >"$log_file" 2>&1 &
+  fi
+  pi_pid=$!
+  start_ts=$(date +%s)
+  last_check=$start_ts
+
+  # Poller prosessen hvert sekund (så en normal, rask kjøring ikke forsinkes),
+  # men gjør selve løkke-/backstop-sjekken kun hvert LOOP_DETECTOR_INTERVAL —
+  # den leser og parser hele sesjonsfila og trenger ikke kjøres oftere.
+  while kill -0 "$pi_pid" 2>/dev/null; do
+    sleep 1
+    kill -0 "$pi_pid" 2>/dev/null || break
+
+    now=$(date +%s)
+    (( now - last_check >= LOOP_DETECTOR_INTERVAL )) || continue
+    last_check=$now
+
+    if (( now - start_ts >= PI_MAX_DURATION )); then
+      PI_GUARD_REASON="backstop-timeout: pi-kjøringen overskred makstid (${PI_MAX_DURATION}s) uten å fullføre"
+      log "Backstop-timeout: dreper pi-prosess (pid $pi_pid) etter $((now - start_ts))s"
+      kill -TERM "$pi_pid" 2>/dev/null || true
+      sleep 2
+      kill -KILL "$pi_pid" 2>/dev/null || true
+      break
+    fi
+
+    session_file=$(find_latest_session_file)
+    if [[ -n "$session_file" ]] && detect_loop "$session_file"; then
+      PI_GUARD_REASON="$LOOP_DETECTOR_MESSAGE"
+      log "Løkkevakt: dreper pi-prosess (pid $pi_pid) — $PI_GUARD_REASON"
+      kill -TERM "$pi_pid" 2>/dev/null || true
+      sleep 2
+      kill -KILL "$pi_pid" 2>/dev/null || true
+      break
+    fi
+  done
+
+  wait "$pi_pid" 2>/dev/null
+  return $?
+}
+
 process_event() {
-  local event_json="$1" id started finished exit_code log_file prompt
+  local event_json="$1" id started finished exit_code log_file prompt guard_reason
   id=$(jq -r '.id // empty' <<<"$event_json")
   [[ -n "$id" ]] || id="evt-$(date +%s%N)"
   id="${id//[^a-zA-Z0-9._-]/_}"
@@ -302,45 +417,60 @@ process_event() {
   log "Behandler event $id ..."
 
   set +e
-  pi "${pi_args[@]}" "$prompt" >"$log_file" 2>&1
+  run_pi_supervised "$log_file" "$prompt"
   exit_code=$?
   set -e
+  guard_reason="$PI_GUARD_REASON"
 
   # Pull the agent's classification (intent + reply + evt. delegate) out of
   # the log, if present. extract_result_json may return non-zero when the
   # RESULT_MARKER is found but the JSON block is malformed — we catch that so
-  # `set -e` does not abort the process_event loop.
+  # `set -e` does not abort the process_event loop. Ble kjøringen drept av
+  # løkkevakt/backstop (#112) er loggen uinteressant — vi vet allerede hvorfor
+  # og skal aldri prøve å tolke en avkuttet pi-output som gyldig resultat.
   local result_json="" intent reply delegate extraction_failed=false
-  set +e
-  result_json=$(extract_result_json "$log_file") || extraction_failed=true
-  set -e
+  if [[ -z "$guard_reason" ]]; then
+    set +e
+    result_json=$(extract_result_json "$log_file") || extraction_failed=true
+    set -e
+  fi
 
   # Automatisk retry (#104): første forsøk feilet enten med ugyldig JSON etter
   # markøren (anførselstegn-glipp), eller markøren manglet helt (#97). Gi
   # modellen ÉN ny sjanse med samme prompt + et kort notat om hva som gikk
-  # galt, før vi faller gjennom til eksisterende #91-fallback.
-  if [[ "$extraction_failed" == true ]]; then
+  # galt, før vi faller gjennom til eksisterende #91-fallback. Kun aktuelt når
+  # løkkevakt/backstop ikke allerede har avgjort utfallet — å prøve på nytt
+  # etter en drept kjøring ville bare risikere å gjenta samme løkke.
+  if [[ "$extraction_failed" == true && -z "$guard_reason" ]]; then
     log "Event $id: AGENT-RESULT mangler eller er ugyldig JSON — prøver ett automatisk retry-forsøk."
     local retry_prompt
     retry_prompt=$(printf '%s\n\n---\nMERK: forrige svaret ditt ble avvist av broen — enten manglet linjen "%s" helt, eller JSON-objektet etter den var ugyldig (f.eks. feil anførselstegn rundt et felt-skille, eller hele objektet pakket i en kodefence). Gjenta oppgaven på nytt og avslutt garantert med en egen linje med kun teksten "%s", etterfulgt av ett gyldig, rått JSON-objekt uten kodefence.\n' \
       "$prompt" "$RESULT_MARKER" "$RESULT_MARKER")
     printf '\n[%s] --- RETRY (#104): forrige AGENT-RESULT var ugyldig/manglet ---\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$log_file"
     set +e
-    pi "${pi_args[@]}" "$retry_prompt" >>"$log_file" 2>&1
+    run_pi_supervised "$log_file" "$retry_prompt" append
     exit_code=$?
     set -e
-    extraction_failed=false
-    set +e
-    result_json=$(extract_result_json "$log_file") || extraction_failed=true
-    set -e
-    if [[ "$extraction_failed" == false ]]; then
-      log "Event $id: retry ga gyldig AGENT-RESULT."
+    guard_reason="$PI_GUARD_REASON"
+    if [[ -z "$guard_reason" ]]; then
+      extraction_failed=false
+      set +e
+      result_json=$(extract_result_json "$log_file") || extraction_failed=true
+      set -e
+      if [[ "$extraction_failed" == false ]]; then
+        log "Event $id: retry ga gyldig AGENT-RESULT."
+      fi
     fi
   fi
 
   finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-  if [[ -n "$result_json" ]]; then
+  if [[ -n "$guard_reason" ]]; then
+    printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "GUARD: $guard_reason" >>"$log_file"
+    intent="action"
+    reply="$guard_reason"
+    delegate=""
+  elif [[ -n "$result_json" ]]; then
     intent=$(jq -r '.intent // empty' <<<"$result_json")
     reply=$(jq -r '.reply // empty' <<<"$result_json")
     delegate=$(jq -c '.delegate // empty' <<<"$result_json")
