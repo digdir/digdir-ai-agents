@@ -6,6 +6,14 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-30** — nvt M0 (issue #96) gjennomført: sandkasse-bevis på WSL2
+  med hele kjeden prompt → levende claude-sesjon (Sonnet via llm-gatewayen)
+  → branch/commit/push/PR av bot-identiteten med broker-utstedt token;
+  oppfølgings-prompt fortsatte samme samtale. Sju praktiske funn (non-root,
+  stier, volumer, commit-identitet, onboarding, host-oppslag) er ført inn i
+  [nvt-agent-integrasjon.md](plans/nvt-agent-integrasjon.md) under
+  «M0-funn». M1-kjernen ligger klar i PR #110.
+
 - **2026-07-28** — PR-prosess (issue #54) sluttført: plattformoppsettet fra
   [pr-prosess.md](pr-prosess.md) er nå aktivt i produksjon. Branch
   protection (required approvals 0 + Require review from Code Owners +

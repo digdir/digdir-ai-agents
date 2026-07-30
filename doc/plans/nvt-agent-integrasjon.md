@@ -274,6 +274,47 @@ PAT på bot-kontoen) gjenbrukes som broker-provider her — men fat-dev bør få
 sitt *eget* token, ikke dele jr-ens, så de kan skilles i audit og
 revokeres hver for seg.
 
+## M0-funn (gjennomført 2026-07-30, WSL2 Ubuntu-24.04)
+
+Hele kjeden er bevist: prompt via `agentdctl` → claude (Sonnet via
+llm-gatewayen) i levende tmux-sesjon → branch + commit + push + PR i
+testrepoet (`nvt-m0-test`) opprettet av bot-identiteten med broker-utstedt
+token — og en oppfølgings-prompt i samme sesjon fortsatte samme samtale
+(PR-en fikk commit nr. 2 uten re-forklaring av kontekst). code-server
+svarer bak Traefik. Verifisert: `FATDEV_GH_TOKEN` finnes ikke i
+agentcontainerens env; i direct mode/file-bundle ligger en liten
+credential-config (`~/.nvt-agent/git-credentials/config.yaml`, ~200 bytes)
+som `git-credential-nvt`-helperen og `gh-auth`-wrapperen bruker —
+tokenverdien selv bor kun i `.broker/env` på hosten. Modell-allowlisten i
+gatewayen håndhever fail-closed (verifisert med avvist modell).
+
+Feller M1-implementasjonen må kjenne (alle truffet i praksis):
+
+1. **claude nekter `--dangerously-skip-permissions` som root** → agenten
+   MÅ kjøres i nvt-ens non-root-modus (`agent-init --user non-root`).
+   Symptom ellers: tmux-sesjonen dør innen 5 s, tre forsøk, container exit.
+2. **nvt-sjekkouten kan ikke ligge under `/root`** på verten: workspace
+   bind-mountes på samme absolutte sti i containeren, og uid 1000 kommer
+   ikke gjennom `/root` (700). Bruk f.eks. `/srv/nvt-agent`. (Samme krav
+   som bridge-planens «host-gyldige stier».)
+3. **Bytte root→non-root på eksisterende agent krever at named-volumene
+   slettes** (`agent-m0_agent-home`, `agent-m0_docker-data`) — de beholder
+   root-eierskap og gir `Permission denied` ved bootstrap.
+4. **`static_token`-provideren støtter ikke `identity.mode: provider`** —
+   commit-identitet må settes eksplisitt i `agent.yaml`
+   (`mode: explicit` + navn/e-post for bot-kontoen).
+5. **claude-onboardingen spiser første prompt**: velkomstskjerm +
+   trust-dialog må gjennom (to Enter i tmux) før agentd-prompts når
+   claude; preseed-`settings.json` dekker det ikke i dag. Bridgen (M1) må
+   enten preseede onboarding-state eller vente på klar-prompt før første
+   injeksjon.
+6. **Gatewayen nås fra agentcontaineren** via `host.docker.internal:8787`
+   (200 OK) tross `network_mode: service:docker` — det åpne spørsmålet fra
+   planen er avklart, ingen gateway-IP-triksing nødvendig.
+7. Diverse: `gh` finnes i runtime-imaget og `gh-auth` (plugin-eksportert
+   wrapper) gir PR-opprettelse uten token i miljøet; Windows-siden må ikke
+   røres — alt kjøres fra WSL2-distroen med filene på Linux-filsystemet.
+
 ## Milepæler
 
 **M0 — Sandkasse-bevis (manuelt, ingen repo-endringer).** Bygg nvt fra
