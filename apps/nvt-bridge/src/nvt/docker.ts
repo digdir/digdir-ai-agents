@@ -206,6 +206,9 @@ export function isDoneEvent(line: string): boolean {
   } catch {
     return false;
   }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return false;
+  }
   const obj = parsed as { type?: unknown; event?: unknown };
   const name = typeof obj.type === "string" ? obj.type : obj.event;
   return name === "plugin.agent.signal.done";

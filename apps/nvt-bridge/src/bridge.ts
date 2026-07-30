@@ -45,6 +45,8 @@ export class NvtBridge {
   private readonly log: (message: string) => void;
   private readonly sleep: (ms: number) => Promise<void>;
 
+  private abortSignal?: AbortSignal;
+
   constructor(opts: BridgeOptions) {
     this.opts = opts;
     this.log = opts.log ?? (() => {});
@@ -75,6 +77,7 @@ export class NvtBridge {
 
   /** Poll-løkka. Kjører til `signal` aborteres. */
   async run(pollMs: number, signal?: AbortSignal): Promise<void> {
+    this.abortSignal = signal;
     await this.opts.triggers.ensureDirs();
     await this.opts.store.load();
     this.log(
@@ -160,6 +163,7 @@ export class NvtBridge {
 
       const outcome = await this.opts.driver.waitForDone(ref, {
         timeoutMs: this.opts.promptTimeoutMs,
+        signal: this.abortSignal,
       });
 
       // Agenten skriver resultatlinja selv. Etter `signal done` gir vi den en

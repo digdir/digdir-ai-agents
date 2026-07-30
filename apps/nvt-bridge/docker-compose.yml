@@ -15,7 +15,7 @@ services:
     restart: ${RESTART_POLICY:-unless-stopped}
     environment:
       # Overstyrer .env-verdien: må være den identiske host-stien (se over).
-      NVT_BRIDGE_TRIGGERS_DIR: ${PIPELINE_ROOT}/agents/nvt-fat-developer/triggers
+      NVT_BRIDGE_TRIGGERS_DIR: ${PIPELINE_ROOT:?PIPELINE_ROOT must be set in .env to absolute host path}/agents/nvt-fat-developer/triggers
       NVT_BRIDGE_STATE_DIR: /app/state
     volumes:
       # Hostens Docker-socket. Bevisst unntak for tiltrodd infrastruktur —
@@ -23,10 +23,10 @@ services:
       # nvt-instansen har sin egen, isolerte dind.
       - /var/run/docker.sock:/var/run/docker.sock
       # nvt-sjekkouten på identisk sti (Make-flyten kjøres herfra).
-      - ${NVT_ROOT}:${NVT_ROOT}
+      - ${NVT_ROOT:?NVT_ROOT must be set in .env to absolute host path}:${NVT_ROOT:?NVT_ROOT must be set in .env to absolute host path}
       # Filkontrakten på identisk sti. Kun triggers/ — verken monorepoet eller
       # deploy-klonen mountes inn noe sted.
-      - ${PIPELINE_ROOT}/agents/nvt-fat-developer/triggers:${PIPELINE_ROOT}/agents/nvt-fat-developer/triggers
+      - ${PIPELINE_ROOT:?PIPELINE_ROOT must be set in .env to absolute host path}/agents/nvt-fat-developer/triggers:${PIPELINE_ROOT:?PIPELINE_ROOT must be set in .env to absolute host path}/agents/nvt-fat-developer/triggers
       # Bridgens egen state (topic → instans) overlever omstart.
       - ./state:/app/state
     security_opt:

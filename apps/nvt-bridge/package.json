@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Deterministisk bro mellom filkontrakten (agents/nvt-fat-developer/triggers/) og levende nvt-agent-instanser: topic -> instans, prompt-injeksjon, fallback-resultatlinje. Ingen LLM.",
   "engines": {
-    "node": ">=22.6"
+    "node": ">=22.18.0"
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/index.ts",

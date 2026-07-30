@@ -19,6 +19,10 @@ test("isDoneEvent ignorerer andre events, støy og ugyldig JSON", () => {
   assert.equal(isDoneEvent(""), false);
   assert.equal(isDoneEvent("   "), false);
   assert.equal(isDoneEvent('"plugin.agent.signal.done"'), false);
+  assert.equal(isDoneEvent("null"), false);
+  assert.equal(isDoneEvent("123"), false);
+  assert.equal(isDoneEvent("true"), false);
+  assert.equal(isDoneEvent('["type","plugin.agent.signal.done"]'), false);
 });
 
 function recordingExec(): { exec: ExecFn; calls: { cmd: string; args: string[]; cwd?: string }[] } {
