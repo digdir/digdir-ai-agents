@@ -11,11 +11,14 @@ git-token utstedt av nvt-brokeren. Samme filkontrakt som de andre agentene
 Design og premisser: [`doc/plans/nvt-agent-integrasjon.md`](../../doc/plans/nvt-agent-integrasjon.md).
 Sporet er issue #95; denne katalogen og broen er M1 (#97).
 
-> **Status: M1-kjerne, ikke tatt i bruk ennå.** Kjernelogikken i broen er
-> implementert og testet, men oppsettet mot ekte nvt-instanser (compose-stier,
-> containernavn, host-oppslag, broker-grant) **kalibreres mot M0-funnene**
-> (issue #96) før agenten rutes trafikk. Ruta i `AGENT_ROUTES` er driftskonfig
-> og settes ved utrulling, ikke her.
+> **Status: M1-kjerne kalibrert mot M0-funnene, ikke tatt i bruk ennå.** Broen
+> kjører nå `agent-init --user non-root`, venter på at CLI-sesjonen er klar før
+> første prompt, validerer at stiene kan traverseres av uid 1000, og genererer
+> instansens `agent.yaml` med eksplisitt commit-identitet. Ende-til-ende mot en
+> ekte instans er fortsatt ikke kjørt — se
+> [`apps/nvt-bridge/README.md`](../../apps/nvt-bridge/README.md) § «Kalibrert
+> mot M0-funnene», særlig volum-hygienen ved bytte fra root til non-root. Ruta
+> i `AGENT_ROUTES` er driftskonfig og settes ved utrulling, ikke her.
 
 ## Arkitektur
 
@@ -55,7 +58,7 @@ Sporet er issue #95; denne katalogen og broen er M1 (#97).
 | Fil | Rolle |
 | --- | --- |
 | `AGENTS.local.md.tmpl` | Instruks-malen som rendres inn i instansens `AGENTS.local.md`. Agentens protokoll. |
-| `.env.example` | Instans-config (git-identitet, broker-provider, LLM-backend). Ingen tokens — de bor i `.broker/`. |
+| `.env.example` | Instans-config (broker-provider, LLM-backend). Ingen tokens — de bor i `.broker/`. Commit-identiteten settes i broens `.env`. |
 | `triggers/` | Filkontrakten. Gitignorert bortsett fra `.gitkeep`. |
 
 ### Instruks-malen
@@ -87,7 +90,9 @@ kommentaren øverst i malen.
 
 # 2) Broen
 Copy-Item apps\nvt-bridge\.env.example apps\nvt-bridge\.env
-# fyll inn NVT_ROOT (nvt-sjekkouten) — se apps/nvt-bridge/README.md
+# fyll inn NVT_ROOT (en sti uid 1000 kan traversere, f.eks. /srv/nvt-agent),
+# NVT_GIT_IDENTITY_NAME/EMAIL og NVT_BROKER_PROVIDER — broen nekter å starte
+# uten. Se apps/nvt-bridge/README.md
 cd apps\nvt-bridge; npm start
 
 # 3) Ruta (driftskonfig, i deploy-klonens .env — ikke i dette repoet)

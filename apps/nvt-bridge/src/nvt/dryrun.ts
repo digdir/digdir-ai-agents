@@ -17,8 +17,18 @@ export class DryRunNvtDriver implements NvtDriver {
   }
 
   async ensureInstance(topic: string, instance: string): Promise<NvtInstance> {
-    this.log(`[dry-run] make agent-init NAME=${instance} && make agent-up NAME=${instance}`);
+    this.log(
+      `[dry-run] bash scripts/agent-init.sh --name ${instance} --user non-root ` +
+        `&& make agent-up NAME=${instance}`,
+    );
     return { topic, instance };
+  }
+
+  async waitUntilReady(instance: NvtInstance): Promise<void> {
+    this.log(
+      `[dry-run] klar-sjekk for ${instance.instance}: session-launched-markør + tmux-panel ` +
+        `(Enter gjennom onboardingen ved behov)`,
+    );
   }
 
   async sendPrompt(instance: NvtInstance, prompt: string): Promise<void> {

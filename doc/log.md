@@ -6,6 +6,24 @@ description: Append-only kronologi over endringer i repoets kunnskapsbase. Nyest
 
 # Logg
 
+- **2026-07-31** — nvt M1-adapteren (issue #97) kalibrert mot M0-funnene.
+  `agent-init` kjøres nå som `scripts/agent-init.sh --user non-root` (make-målet
+  forwarder ikke `--user`), fordi claude nekter bypass-flagget som root.
+  Ny **klar-sjekk** før hver prompt: `session-launched`-markøren må finnes,
+  tmux-sesjonen svare, og panelet ikke vise en onboarding-dialog — ellers
+  spises prompten uten spor. Enter sendes bare når en dialog faktisk står der,
+  aldri i blinde, og timeout gir en ærlig `status:"error"`-linje uten at
+  prompten er sendt. Broen validerer at `NVT_ROOT` og triggers-katalogen kan
+  traverseres av uid 1000 (fail-fast på Linux, advarsel på macOS), og genererer
+  instansens `agent.yaml` med `identity.mode: explicit` — `mode: provider`
+  virker ikke for broker-token, og en eksisterende config med den stopper
+  oppstarten i stedet for å gi en agent uten commit-identitet. Bot-navnet
+  kommer fra env, ikke fra repoet. Volum-hygienen ved bytte root→non-root
+  (`agent-<navn>_agent-home`/`_docker-data` må slettes) er dokumentert i
+  [`apps/nvt-bridge/README.md`](../apps/nvt-bridge/README.md). 119 tester
+  (fra 77); fake-driveren håndhever nå klar-sjekk-før-prompt som kontrakt.
+  Fortsatt ikke kjørt ende-til-ende mot en ekte instans — M1 lukkes først da.
+
 - **2026-07-30** — nvt M0 (issue #96) gjennomført: sandkasse-bevis på WSL2
   med hele kjeden prompt → levende claude-sesjon (Sonnet via llm-gatewayen)
   → branch/commit/push/PR av bot-identiteten med broker-utstedt token;
