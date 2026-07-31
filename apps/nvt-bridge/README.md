@@ -114,13 +114,19 @@ instans, hent det ut via code-server først.
 Workspacet bind-mountes på samme absolutte sti inne i containeren, og agenten
 er `1000:1000`. Ligger `NVT_ROOT` under `/root` (mode 0700), feiler bootstrap
 inne i containeren med en kryptisk `Permission denied`. Broen sjekker derfor
-hele stien til `NVT_ROOT` og triggers-katalogen ved oppstart og **nekter å
-starte** med en melding om hvilket ledd som stopper uid 1000. Bruk f.eks.
+hele stien til `NVT_ROOT` og triggers-katalogen ved oppstart — sistnevnte også
+for *skrive*tilgang, siden agenten appender resultatlinja selv. Symlenker løses
+først, så en lenke ikke kan skjule at målets foreldre er stengt. Bruk f.eks.
 `/srv/nvt-agent`.
 
-Sjekken håndheves bare på Linux — Docker Desktop på macOS mapper eierskap i
-virtiofs-laget, så host-mode-bitene der ville gitt falske avvisninger. Der
-logges funnet som en advarsel. `NVT_BRIDGE_SKIP_PATH_CHECK=1` slår den av helt.
+**Hva sjekken faktisk kan svare på:** mode-bitene broen leser må være hostens.
+Det stemmer når broen kjører som node-prosess på hosten (`npm start`) — da
+**nekter den å starte** med en melding om hvilket ledd som stopper uid 1000.
+Kjører broen selv i container, er bare `NVT_ROOT` og triggers-katalogen
+bind-mountet; mellomleddene er mount-point-foreldre Docker har laget, med helt
+andre rettigheter enn hostens. Da logges funnet som en **advarsel** i stedet, og
+stien må kontrolleres på hosten. Samme gjelder macOS, der Docker Desktop mapper
+eierskap i virtiofs-laget. `NVT_BRIDGE_SKIP_PATH_CHECK=1` slår sjekken av helt.
 
 ### 4. Commit-identitet må være eksplisitt i `agent.yaml`
 
@@ -142,11 +148,29 @@ som injiseres da forsvinner **uten spor** — ingen feil, ingen `signal done`,
 bare en timeout en time senere. `agentd` venter selv på
 `session-launched`-markøren og tmux-sesjonen, men vet ikke om dialogene.
 
-Broen krever derfor tre ting før første prompt: markøren finnes, tmux-sesjonen
-svarer, og panelet (`tmux capture-pane`) viser en klar-prompt. Står en dialog
-der, sendes ett Enter per runde (maks `NVT_BRIDGE_MAX_ONBOARDING_ENTER`, default
-3). Enter sendes **aldri** i blinde: inn i en sesjon som venter på svar ville
-det sendt av halvskrevet input.
+Onboardingen er en **sesjonsstart**-tilstand, så gaten har to nivåer:
+
+| Tilstand | Krav før prompten sendes |
+| --- | --- |
+| Fersk sesjon (klar-prompten er ikke sett i denne container-inkarnasjonen) | Markøren finnes, tmux svarer, og panelet (`tmux capture-pane`) viser klar-prompt. Står en onboarding-dialog der, sendes ett Enter per runde (maks `NVT_BRIDGE_MAX_ONBOARDING_ENTER`, default 3). |
+| Bekreftet sesjon | Markøren finnes og tmux-sesjonen lever. Panelet leses ikke. |
+
+Enter sendes altså aldri i blinde — bare når en dialog faktisk er tegnet i en
+sesjon som ikke har vært i bruk.
+
+To detaljer som er verdt å kjenne:
+
+- **Panelet leses bare på en fersk sesjon**, fordi det ellers inneholder
+  transkriptet — inkludert den delegerte oppgaveteksten, som er upålitelig
+  input. Lot vi den styre gaten, kunne en avsender som skrev
+  «Do you trust the files in this folder?» i oppgaven fått broen til å tro at en
+  dialog sto der, og dermed blokkert topicet. Mønstrene er i tillegg
+  linjeankret, slik at et ekko av oppgaveteksten (som står bak en `>`-prompt)
+  ikke matcher.
+- **Klar-tilstanden gjelder én container-inkarnasjon** (`docker inspect` sin
+  `Id` + `StartedAt`). Restartes containeren utenfor broen — `docker restart`,
+  host-reboot med `restart: unless-stopped` — er det en ny sesjon med ny
+  onboarding, og gaten blir streng igjen selv om broen aldri kjørte `agent-up`.
 
 Blir sesjonen ikke klar innen `NVT_BRIDGE_READY_TIMEOUT_SECONDS`, kaster
 sjekken, prompten sendes ikke, og eventet får en `status:"error"`-linje med
@@ -154,10 +178,10 @@ peker til code-server. Feilmeldingen gjengir **ikke** panelinnholdet — den gå
 videre til Slack, og en tmux-skjerm kan inneholde hva som helst.
 
 Mønstergjenkjenning mot et TUI er heuristikk. Bytter claude ordlyd, kan
-mønstrene settes med `NVT_READY_PATTERN` / `NVT_ONBOARDING_PATTERN` uten
-kodeendring. Etter at klar-prompten er sett én gang i en sesjon, godtar broen
-«lever, ingen dialog» for de neste promptene — da kan agenten være midt i
-arbeid, og `agentd` køer prompten selv.
+mønstrene settes med `NVT_READY_PATTERN` / `NVT_ONBOARDING_PATTERN` (regex,
+case-insensitive) uten kodeendring. Feiler klar-mønsteret å matche en sesjon som
+*er* klar, blir utfallet en ærlig feilmelding og en uendret innboks — ikke en
+tapt oppgave.
 
 ## Oppstart
 

@@ -3,7 +3,9 @@ import { test } from "node:test";
 import { classifyPane, DEFAULT_READY_PATTERN, patternFromEnv } from "./ready.ts";
 
 test("velkomstskjerm og trust-dialog klassifiseres som onboarding", () => {
-  assert.equal(classifyPane("╭─ Welcome to Claude Code ─╮"), "onboarding");
+  // Slik claude faktisk tegner dem: tekst inne i en ramme.
+  assert.equal(classifyPane("│ ✻ Welcome to Claude Code!"), "onboarding");
+  assert.equal(classifyPane("╭─────────╮\n│ Do you trust the files in this folder?"), "onboarding");
   assert.equal(classifyPane("Do you trust the files in this folder?"), "onboarding");
   assert.equal(classifyPane("  Press Enter to continue…"), "onboarding");
 });
@@ -20,6 +22,25 @@ test("en onboarding-dialog oppå en ellers klar sesjon er IKKE klar", () => {
     "onboarding",
     "dialogen fanger tastetrykket — å gjette «ready» her er nettopp M0-feilen",
   );
+});
+
+test("oppgavetekst i transkriptet utløser IKKE onboarding-tilstand", () => {
+  // Panelet inneholder claudes transkript, altså den delegerte prompten —
+  // upålitelig input. Uten linjeanker kunne avsender fått broen til å tro at en
+  // dialog sto der, og dermed blokkert topicet (og fått Enter sendt inn i en
+  // levende sesjon).
+  const pane = [
+    "> Fiks dette: dialogen «Do you trust the files in this folder?» henger",
+    "● Ser på saken …",
+    "│ > ",
+    "  ? for shortcuts",
+  ].join("\n");
+  assert.equal(classifyPane(pane), "ready");
+});
+
+test("bare de siste linjene av panelet vurderes", () => {
+  const pane = ["Welcome to Claude Code", ...Array(40).fill("● jobber …")].join("\n");
+  assert.equal(classifyPane(pane), "unknown", "gammelt transkript skal ikke matche");
 });
 
 test("et panel som jobber er verken onboarding eller ready", () => {

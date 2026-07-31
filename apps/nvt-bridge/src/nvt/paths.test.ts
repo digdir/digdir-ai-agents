@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   agentCanTraverse,
+  agentCanWrite,
   ancestorPaths,
   assertAgentCanTraverse,
   traversalProblems,
@@ -60,10 +61,35 @@ test("en manglende katalog rapporteres, og resten av stien droppes", async () =>
   assert.deepEqual(problems, [{ path: "/srv", reason: "missing" }]);
 });
 
+test("agentCanWrite: w for other, eller eier/gruppe 1000 med w", () => {
+  assert.equal(agentCanWrite({ mode: 0o777, uid: 0, gid: 0 }), true);
+  assert.equal(agentCanWrite({ mode: 0o755, uid: 0, gid: 0 }), false, "root-eid triggers/");
+  assert.equal(agentCanWrite({ mode: 0o755, uid: 1000, gid: 1000 }), true);
+  assert.equal(agentCanWrite({ mode: 0o775, uid: 0, gid: 1000 }), true);
+});
+
+test("skrivekrav gjelder katalogen selv, ikke foreldrene", async () => {
+  const stat = fakeStat({
+    "/": { mode: 0o755 },
+    "/srv": { mode: 0o755 },
+    "/srv/triggers": { mode: 0o755, uid: 0, gid: 0 },
+  });
+  assert.deepEqual(await traversalProblems("/srv/triggers", stat), [], "traversering er ok");
+  const problems = await traversalProblems("/srv/triggers", stat, { requireWrite: true });
+  assert.deepEqual(problems, [
+    { path: "/srv/triggers", reason: "not-writable", mode: 0o755, uid: 0 },
+  ]);
+});
+
 test("assertAgentCanTraverse kaster med årsak, sti og /root-hintet", async () => {
   const stat = fakeStat({ "/": { mode: 0o755 }, "/root": { mode: 0o700 }, "/root/nvt": { mode: 0o755 } });
   await assert.rejects(
-    () => assertAgentCanTraverse("NVT_ROOT", "/root/nvt", { statFn: stat, platform: "linux" }),
+    () =>
+      assertAgentCanTraverse("NVT_ROOT", "/root/nvt", {
+        statFn: stat,
+        platform: "linux",
+        containerized: false,
+      }),
     (err: Error) => {
       assert.match(err.message, /NVT_ROOT="\/root\/nvt"/);
       assert.match(err.message, /\/root \(mode 0700, eier uid 0\)/);
@@ -79,6 +105,43 @@ test("relative stier avvises — bind-mounts kan ikke oversettes", async () => {
     () => assertAgentCanTraverse("NVT_ROOT", "../nvt-agent", { platform: "linux" }),
     /absolutt sti/,
   );
+});
+
+test("symlenker løses før vandringen (ellers skjules målets foreldre)", async () => {
+  // /opt/link → /root/hidden. Leksikalsk vandring ville aldri sett /root.
+  const stat = fakeStat({
+    "/": { mode: 0o755 },
+    "/opt": { mode: 0o755 },
+    "/opt/link": { mode: 0o777 },
+    "/root": { mode: 0o700 },
+    "/root/hidden": { mode: 0o755 },
+  });
+  await assert.rejects(
+    () =>
+      assertAgentCanTraverse("NVT_ROOT", "/opt/link", {
+        statFn: stat,
+        realpathFn: async (p) => (p === "/opt/link" ? "/root/hidden" : p),
+        platform: "linux",
+        containerized: false,
+      }),
+    (err: Error) => {
+      assert.match(err.message, /realpath: "\/root\/hidden"/);
+      assert.match(err.message, /\/root \(mode 0700/);
+      return true;
+    },
+  );
+});
+
+test("i container er funnet en advarsel — vi ser ikke hostens mode-bits", async () => {
+  const stat = fakeStat({ "/": { mode: 0o755 }, "/root": { mode: 0o700 }, "/root/nvt": { mode: 0o755 } });
+  const logged: string[] = [];
+  await assertAgentCanTraverse("NVT_ROOT", "/root/nvt", {
+    statFn: stat,
+    platform: "linux",
+    containerized: true,
+    log: (m) => logged.push(m),
+  });
+  assert.match(logged[0]!, /ADVARSEL.*kjører i container og ser ikke hostens mode-bits/s);
 });
 
 test("utenfor Linux er funnet en advarsel, ikke en blokkering", async () => {

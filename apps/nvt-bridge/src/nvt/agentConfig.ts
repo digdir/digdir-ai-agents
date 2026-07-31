@@ -121,6 +121,8 @@ plugins:
 export type IdentityVerdict =
   | { kind: "explicit" }
   | { kind: "provider"; line: number }
+  /** `identity: {mode: …}` på én linje — utenfor det denne skanneren leser. */
+  | { kind: "unreadable"; line: number }
   | { kind: "absent" };
 
 /**
@@ -136,6 +138,7 @@ export function identityMode(yamlText: string): IdentityVerdict {
   const lines = yamlText.split("\n");
   let identityIndent: number | null = null;
   let sawExplicit = false;
+  let unreadableLine: number | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i]!;
@@ -148,7 +151,17 @@ export function identityMode(yamlText: string): IdentityVerdict {
       // Blokka er slutt (samme eller lavere nivå enn `identity:` selv).
       identityIndent = null;
     }
-    if (/^identity:\s*$/.test(content)) {
+    const inline = /^-?\s*identity:\s*(\S.*)$/.exec(content);
+    if (inline) {
+      // Flow-style (`identity: {mode: provider}`). Vi leser mode-en når den er
+      // åpenbar, og flagger ellers at fila ikke kan verifiseres — heller det
+      // enn å svare «ingen identitet» om en config som har en.
+      if (/\bmode:\s*["']?provider\b/.test(inline[1]!)) return { kind: "provider", line: i + 1 };
+      if (/\bmode:\s*["']?explicit\b/.test(inline[1]!)) sawExplicit = true;
+      else unreadableLine ??= i + 1;
+      continue;
+    }
+    if (/^-?\s*identity:\s*$/.test(content)) {
       identityIndent = indent;
       continue;
     }
@@ -160,7 +173,9 @@ export function identityMode(yamlText: string): IdentityVerdict {
     if (value === "provider") return { kind: "provider", line: i + 1 };
     if (value === "explicit") sawExplicit = true;
   }
-  return sawExplicit ? { kind: "explicit" } : { kind: "absent" };
+  if (sawExplicit) return { kind: "explicit" };
+  if (unreadableLine !== null) return { kind: "unreadable", line: unreadableLine };
+  return { kind: "absent" };
 }
 
 /**
@@ -183,6 +198,15 @@ export function identityProblem(
         `broker-token/static_token-providere (M0-funn 4) — agenten ender uten commit-identitet og ` +
         `'git commit' feiler etter at jobben er gjort. Sett 'mode: explicit' med navn og e-post ` +
         `for bot-kontoen.`,
+    };
+  }
+  if (verdict.kind === "unreadable") {
+    return {
+      level: "warn",
+      message:
+        `${configPath} har en 'identity'-blokk på én linje (linje ${verdict.line}) som broen ikke ` +
+        `kan verifisere. Kontrollér selv at den er 'mode: explicit' med navn og e-post — ` +
+        `'mode: provider' virker ikke for broker-token (M0-funn 4).`,
     };
   }
   return {

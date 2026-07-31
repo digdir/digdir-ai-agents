@@ -23,7 +23,7 @@ interface Recorded {
 }
 
 interface ExecOptions {
-  /** Svar fra `docker inspect` — er instansen oppe? */
+  /** Svar fra `docker inspect -f {{.State.Running}}` — er instansen oppe? */
   running?: boolean;
   /** Finnes `session-launched`-markøren? */
   marker?: boolean;
@@ -31,14 +31,25 @@ interface ExecOptions {
   panes?: string[];
   /** `capture-pane` feiler (ingen tmux-sesjon). */
   paneFails?: boolean;
+  /** `tmux has-session` feiler (brukes når panelet ikke leses). */
+  sessionGone?: boolean;
+  /** Container-inkarnasjon per oppslag. Siste verdi gjentas — endres den, er containeren restartet. */
+  incarnations?: string[];
 }
 
 function recordingExec(opts: ExecOptions = {}): { exec: ExecFn; calls: Recorded[] } {
   const calls: Recorded[] = [];
   const panes = [...(opts.panes ?? ["? for shortcuts"])];
+  const incarnations = [...(opts.incarnations ?? ["sha256:abc 2026-07-31T10:00:00Z"])];
   const exec: ExecFn = async (cmd, args, execOpts) => {
     calls.push({ cmd, args, cwd: execOpts.cwd });
     if (cmd === "docker" && args[0] === "inspect") {
+      if (args.some((a) => a.includes("{{.Id}}"))) {
+        const value = incarnations.length > 1 ? incarnations.shift()! : (incarnations[0] ?? "");
+        return value === ""
+          ? { code: 1, stdout: "", stderr: "No such object\n" }
+          : { code: 0, stdout: `${value}\n`, stderr: "" };
+      }
       return opts.running
         ? { code: 0, stdout: "true\n", stderr: "" }
         : { code: 1, stdout: "", stderr: "" };
@@ -47,6 +58,11 @@ function recordingExec(opts: ExecOptions = {}): { exec: ExecFn; calls: Recorded[
       if (opts.paneFails) return { code: 1, stdout: "", stderr: "no server running\n" };
       const text = panes.length > 1 ? panes.shift()! : (panes[0] ?? "");
       return { code: 0, stdout: text, stderr: "" };
+    }
+    if (args.includes("has-session")) {
+      return opts.sessionGone
+        ? { code: 1, stdout: "", stderr: "can't find session\n" }
+        : { code: 0, stdout: "", stderr: "" };
     }
     if (args.includes("sh") && args.some((a) => a.includes("session-launched"))) {
       return { code: opts.marker === false ? 1 : 0, stdout: "", stderr: "" };
@@ -80,7 +96,12 @@ const identity = {
 function driverWith(
   execOpts: ExecOptions = {},
   overrides: Partial<ConstructorParameters<typeof DockerNvtDriver>[0]> = {},
-) {
+): {
+  driver: DockerNvtDriver;
+  calls: Recorded[];
+  fs: FsFns & { files: Map<string, string> };
+  execOpts: ExecOptions;
+} {
   const { exec, calls } = recordingExec(execOpts);
   const fs = memoryFs();
   const driver = new DockerNvtDriver({
@@ -92,7 +113,9 @@ function driverWith(
     sleep: async () => {},
     ...overrides,
   });
-  return { driver, calls, fs };
+  // `execOpts` leses ved hvert kall, så en test kan endre tilstanden underveis
+  // (sesjonen dør, containeren restartes).
+  return { driver, calls, fs, execOpts };
 }
 
 test("isDoneEvent gjenkjenner plugin.agent.signal.done på begge feltnavn", () => {
@@ -337,25 +360,74 @@ test("waitUntilReady respekterer abort (broen avslutter)", async () => {
   );
 });
 
-test("etter bekreftet klar-tilstand godtas «lever, men ingen klar-prompt» (agenten kan jobbe)", async () => {
-  const { driver } = driverWith({ panes: ["? for shortcuts", "kompilerer …"] });
+test("etter bekreftet klar-tilstand holder det at tmux-sesjonen lever", async () => {
+  const { driver, calls } = driverWith({ panes: ["? for shortcuts"] });
   const ref = { topic: "t", instance: "i" };
   await driver.waitUntilReady(ref, { timeoutMs: 1000 });
-  // Panelet viser nå arbeid, ikke klar-prompt. Sesjonen lever og ingen dialog
-  // står i veien, så agentd køer prompten selv.
+  const before = calls.length;
+  // Agenten kan være midt i arbeid; agentd køer prompten selv.
   await driver.waitUntilReady(ref, { timeoutMs: 1 });
+
+  const after = calls.slice(before);
+  assert.ok(
+    after.some((c) => c.args.includes("has-session")),
+    "sesjonen sjekkes fortsatt",
+  );
+  assert.equal(
+    after.some((c) => c.args.includes("capture-pane")),
+    false,
+    "panelet inneholder transkriptet (upålitelig input) og skal ikke styre gaten her",
+  );
 });
 
-test("en dialog etter bekreftet klar-tilstand godtas IKKE", async () => {
-  const { driver } = driverWith({
-    panes: ["? for shortcuts", "Do you trust the files in this folder?"],
-  });
+test("dør tmux-sesjonen etter bekreftet klar-tilstand, leveres ingenting", async () => {
+  const { driver, execOpts } = driverWith({ panes: ["? for shortcuts"] });
   const ref = { topic: "t", instance: "i" };
   await driver.waitUntilReady(ref, { timeoutMs: 1000 });
+
+  execOpts.sessionGone = true;
+  await assert.rejects(
+    () => driver.waitUntilReady(ref, { timeoutMs: 1 }),
+    /tmux-sesjon «agent»: nei/,
+  );
+});
+
+test("restartes containeren utenfor broen, gjøres klar-sjekken på nytt", async () => {
+  // Klar-tilstanden gjelder én container-inkarnasjon. `docker restart` eller en
+  // host-reboot gir ny sesjon med ny onboarding, selv om broen aldri kjørte
+  // agent-up — da må gaten være streng igjen.
+  const { driver, calls } = driverWith(
+    {
+      panes: ["? for shortcuts", "│ ✻ Welcome to Claude Code!"],
+      incarnations: ["sha256:abc 10:00:00Z", "sha256:abc 11:30:00Z"],
+    },
+    { maxEnterPresses: 0 },
+  );
+  const ref = { topic: "t", instance: "i" };
+  await driver.waitUntilReady(ref, { timeoutMs: 1000 });
+
+  const before = calls.length;
   await assert.rejects(
     () => driver.waitUntilReady(ref, { timeoutMs: 1 }),
     /panel: onboarding/,
+    "ny inkarnasjon ⇒ panelet leses igjen, og onboardingen fanges",
   );
+  assert.ok(
+    calls.slice(before).some((c) => c.args.includes("capture-pane")),
+    "streng sjekk leser panelet",
+  );
+});
+
+test("svarer docker inspect ikke, behandles sesjonen som fersk (trygg side)", async () => {
+  const { driver } = driverWith({
+    panes: ["? for shortcuts"],
+    incarnations: ["sha256:abc 10:00:00Z", ""],
+  });
+  const ref = { topic: "t", instance: "i" };
+  await driver.waitUntilReady(ref, { timeoutMs: 1000 });
+  // Uten inkarnasjon vet vi ikke om det er samme sesjon → streng sjekk, som her
+  // fortsatt viser klar-prompt.
+  await driver.waitUntilReady(ref, { timeoutMs: 1000 });
 });
 
 // --- prompt og opprydding ---------------------------------------------------

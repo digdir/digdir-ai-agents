@@ -29,7 +29,12 @@ const config = loadConfig();
 if (!config.dryRun) {
   const pathCheck = { skip: config.skipPathCheck, log };
   await assertAgentCanTraverse("NVT_ROOT", config.nvtRoot, pathCheck);
-  await assertAgentCanTraverse("NVT_BRIDGE_TRIGGERS_DIR", config.triggersDir, pathCheck);
+  // Agenten skriver resultatlinja selv, så triggers/ må også være skrivbar for
+  // uid 1000 — ellers ender hvert event i fallback-feil etter en time.
+  await assertAgentCanTraverse("NVT_BRIDGE_TRIGGERS_DIR", config.triggersDir, {
+    ...pathCheck,
+    requireWrite: true,
+  });
 }
 
 const driver: NvtDriver = config.dryRun

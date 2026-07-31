@@ -1,4 +1,5 @@
-import { stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 /**
@@ -12,9 +13,13 @@ import path from "node:path";
  * kryptisk feil langt fra årsaken. M0 brant en økt på nettopp dette, så broen
  * sier det fra før den starter å polle.
  *
- * Sjekken er en *host*-sjekk og kjøres bare på Linux. Docker Desktop på macOS
- * mapper eierskap i virtiofs-laget, så de samme mode-bitene der ville gitt
- * falske avvisninger — se `assertAgentCanTraverse`.
+ * Sjekken håndheves bare når broen faktisk *ser* hosten: på Linux, og ikke i
+ * container. Kjører broen selv i container (den dokumenterte driftsformen), er
+ * bare `NVT_ROOT` og triggers-katalogen bind-mountet — mellomleddene er
+ * mount-point-foreldre Docker har laget, med helt andre mode-bits enn hostens.
+ * Da ville både falske avvisninger og falsk trygghet vært mulig, så funnene
+ * logges som advarsel i stedet. Det samme gjelder macOS, der Docker Desktop
+ * mapper eierskap i virtiofs-laget. Se `assertAgentCanTraverse`.
  */
 
 /** Uid/gid agenten kjører som i nvt-ens non-root-modus (`--user non-root`). */
@@ -32,7 +37,7 @@ export type StatFn = (target: string) => Promise<StatResult>;
 export interface TraversalProblem {
   path: string;
   /** Mangler stien helt, er `mode`/`uid` ukjent. */
-  reason: "missing" | "not-traversable";
+  reason: "missing" | "not-traversable" | "not-writable";
   mode?: number;
   uid?: number;
 }
@@ -62,13 +67,29 @@ export function agentCanTraverse(info: StatResult): boolean {
   return false;
 }
 
-/** Alle ledd i stien uid 1000 ikke kommer gjennom, øverste først. */
+/** Kan uid 1000 skrive i katalogen? Brukes for triggers/, som agenten appender i. */
+export function agentCanWrite(info: StatResult): boolean {
+  if ((info.mode & 0o002) !== 0) return true;
+  if (info.uid === AGENT_UID && (info.mode & 0o200) !== 0) return true;
+  if (info.gid === AGENT_GID && (info.mode & 0o020) !== 0) return true;
+  return false;
+}
+
+/**
+ * Alle ledd i stien uid 1000 ikke kommer gjennom, øverste først.
+ *
+ * `absolute` forventes å være realpath-løst (se `assertAgentCanTraverse`):
+ * vandringen er leksikalsk, så en symlenke midt i stien ville ellers skjult at
+ * *målets* foreldre er ugjennomtrengelige.
+ */
 export async function traversalProblems(
   absolute: string,
   statFn: StatFn = defaultStat,
+  opts: { requireWrite?: boolean } = {},
 ): Promise<TraversalProblem[]> {
   const problems: TraversalProblem[] = [];
-  for (const dir of ancestorPaths(absolute)) {
+  const dirs = ancestorPaths(absolute);
+  for (const dir of dirs) {
     let info: StatResult;
     try {
       info = await statFn(dir);
@@ -85,14 +106,32 @@ export async function traversalProblems(
         uid: info.uid,
       });
     }
+    // Skrivetilgang kreves bare på katalogen selv, ikke på foreldrene.
+    if (opts.requireWrite && dir === dirs.at(-1) && !agentCanWrite(info)) {
+      problems.push({
+        path: dir,
+        reason: "not-writable",
+        mode: info.mode & 0o7777,
+        uid: info.uid,
+      });
+    }
   }
   return problems;
 }
 
 export interface PathCheckOptions {
   statFn?: StatFn;
+  /** Løser symlenker før vandringen. Default `fs.realpath`. */
+  realpathFn?: (target: string) => Promise<string>;
   /** Default `process.platform`. Håndheves bare på Linux (se over). */
   platform?: string;
+  /**
+   * Kjører broen selv i container? Default: finnes `/.dockerenv`. Da ser vi
+   * ikke hostens mode-bits, og funnene blir en advarsel.
+   */
+  containerized?: boolean;
+  /** Krev at agenten kan skrive i katalogen (triggers/). */
+  requireWrite?: boolean;
   /** Rømningsluke: `NVT_BRIDGE_SKIP_PATH_CHECK=1`. */
   skip?: boolean;
   log?: (message: string) => void;
@@ -102,8 +141,9 @@ export interface PathCheckOptions {
  * Fail-fast før broen begynner å polle: kaster med en melding som peker på
  * *hvilket* ledd i stien som stopper uid 1000, og hva man gjør med det.
  *
- * På andre plattformer enn Linux logges funnene som en advarsel i stedet for å
- * kaste: mode-bitene på hosten er da ikke det agenten faktisk møter.
+ * Kaster bare når broen faktisk ser hosten (Linux, ikke i container) — ellers
+ * logges funnet som advarsel, fordi mode-bitene vi leser da ikke er de agenten
+ * møter. Se kommentaren øverst i fila.
  */
 export async function assertAgentCanTraverse(
   label: string,
@@ -122,25 +162,50 @@ export async function assertAgentCanTraverse(
     );
   }
 
-  const problems = await traversalProblems(absolute, opts.statFn);
+  // Symlenker: vandringen under er leksikalsk, så vi må se på den faktiske
+  // stien. Feiler realpath (finnes ikke), sier vandringen det tydeligere.
+  const realpathFn = opts.realpathFn ?? defaultRealpath;
+  let resolved = absolute;
+  try {
+    resolved = await realpathFn(absolute);
+  } catch {
+    // Beholder den oppgitte stien; `traversalProblems` rapporterer «missing».
+  }
+
+  const problems = await traversalProblems(resolved, opts.statFn, {
+    requireWrite: opts.requireWrite,
+  });
   if (problems.length === 0) return;
 
   const details = problems
-    .map((p) =>
-      p.reason === "missing"
-        ? `${p.path} (finnes ikke, eller broen får ikke lese den)`
-        : `${p.path} (mode ${(p.mode ?? 0).toString(8).padStart(4, "0")}, eier uid ${p.uid})`,
-    )
+    .map((p) => {
+      const mode = `mode ${(p.mode ?? 0).toString(8).padStart(4, "0")}, eier uid ${p.uid}`;
+      if (p.reason === "missing") return `${p.path} (finnes ikke, eller broen får ikke lese den)`;
+      if (p.reason === "not-writable") return `${p.path} (ikke skrivbar: ${mode})`;
+      return `${p.path} (${mode})`;
+    })
     .join(", ");
+  const via = resolved === absolute ? "" : ` (realpath: "${resolved}")`;
   const message =
-    `${label}="${absolute}" ligger bak katalog(er) som uid ${AGENT_UID} ikke kommer gjennom: ` +
-    `${details}. Agenten kjører som ${AGENT_UID}:${AGENT_GID} (nvt --user non-root) og får ` +
+    `${label}="${absolute}"${via} er ikke tilgjengelig for uid ${AGENT_UID}: ${details}. ` +
+    `Agenten kjører som ${AGENT_UID}:${AGENT_GID} (nvt --user non-root) og får ` +
     `«Permission denied» i bootstrap. Flytt sjekkouten til en sti alle kan traversere ` +
     `(f.eks. /srv/nvt-agent), eller gi leddet +x. Kjent M0-felle: /root er mode 0700.`;
 
   const platform = opts.platform ?? process.platform;
+  const containerized = opts.containerized ?? existsSync("/.dockerenv");
   if (platform !== "linux") {
     log(`ADVARSEL: ${message} (ikke håndhevet på ${platform})`);
+    return;
+  }
+  if (containerized) {
+    // I container er mellomleddene mount-point-foreldre Docker har laget, ikke
+    // hostens kataloger. Vi kan altså ikke stole på funnet — men det kan være
+    // ekte, så det skal stå i loggen.
+    log(
+      `ADVARSEL: ${message} (broen kjører i container og ser ikke hostens mode-bits — ` +
+        `sjekk stien på hosten selv)`,
+    );
     return;
   }
   throw new Error(message);
@@ -150,3 +215,5 @@ const defaultStat: StatFn = async (target) => {
   const info = await stat(target);
   return { mode: info.mode, uid: info.uid, gid: info.gid };
 };
+
+const defaultRealpath = (target: string): Promise<string> => realpath(target);

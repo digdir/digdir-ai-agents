@@ -93,6 +93,22 @@ test("identityMode bryr seg ikke om kommentarer", () => {
   assert.equal(identityMode(yaml).kind, "explicit");
 });
 
+test("flow-style identity fanges: mode: provider på én linje er fortsatt feil", () => {
+  const yaml = "        - identity: {mode: provider, name: x}\n";
+  assert.deepEqual(identityMode(yaml), { kind: "provider", line: 1 });
+  assert.equal(identityProblem(yaml, "/x/agent.yaml")?.level, "error");
+});
+
+test("flow-style med explicit godtas, uleselig flow-style gir advarsel", () => {
+  assert.equal(identityMode('identity: {mode: "explicit", name: "B"}').kind, "explicit");
+
+  const odd = identityMode("identity: &anchor\nsomething: else");
+  assert.deepEqual(odd, { kind: "unreadable", line: 1 });
+  const problem = identityProblem("identity: &anchor\nsomething: else", "/x/agent.yaml");
+  assert.equal(problem?.level, "warn");
+  assert.match(problem!.message, /ikke kan verifisere/);
+});
+
 test("identityProblem: provider er feil, manglende identitet er en advarsel", () => {
   const provider = identityProblem("identity:\n  mode: provider\n", "/x/agent.yaml");
   assert.equal(provider?.level, "error");

@@ -57,6 +57,20 @@ export function loadConfig(
     throw new Error(`NVT_AGENT_USER_MODE: forventet "non-root" eller "root", fikk "${userMode}"`);
   }
 
+  // Valideres her, ikke per event: `agent-init` og runtime-argumentene i
+  // agent.yaml støtter bare disse to. Ellers hadde broen startet fint og feilet
+  // først når en oppgave kom — én feilmelding til Slack per delegering.
+  const agentType = (env.NVT_AGENT_TYPE ?? "claude").trim();
+  if (agentType !== "claude" && agentType !== "codex") {
+    throw new Error(`NVT_AGENT_TYPE: forventet "claude" eller "codex", fikk "${agentType}"`);
+  }
+  const autonomy = (env.NVT_AGENT_AUTONOMY ?? "trusted-local").trim();
+  if (autonomy !== "trusted-local" && autonomy !== "interactive") {
+    throw new Error(
+      `NVT_AGENT_AUTONOMY: forventet "trusted-local" eller "interactive", fikk "${autonomy}"`,
+    );
+  }
+
   // Commit-identiteten må stå eksplisitt i agent.yaml (M0-funn 4), og
   // bot-navnet skal ikke i repoet — derfor env, uten default. Mangler den,
   // ville agenten jobbet en time og så feilet på `git commit`.
@@ -96,8 +110,8 @@ export function loadConfig(
     idleTtlMs:
       intFrom(env.NVT_BRIDGE_IDLE_TTL_MINUTES, 180, "NVT_BRIDGE_IDLE_TTL_MINUTES", 0) * 60_000,
     nvtRoot,
-    agentType: (env.NVT_AGENT_TYPE ?? "claude").trim(),
-    autonomy: (env.NVT_AGENT_AUTONOMY ?? "trusted-local").trim(),
+    agentType,
+    autonomy,
     userMode,
     tmuxSession: (env.NVT_AGENT_TMUX_SESSION ?? "agent").trim(),
     readyTimeoutMs:

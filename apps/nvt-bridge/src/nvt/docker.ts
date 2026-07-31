@@ -106,11 +106,13 @@ export class DockerNvtDriver implements NvtDriver {
   /** Instanser vi har kjørt `agent-up` for i denne prosessen. */
   private readonly started = new Set<string>();
   /**
-   * Instanser vi har sett klar-prompten i. Første prompt i en sesjon krever
-   * *positiv* klar-tilstand; senere prompts godtar «lever, ingen dialog» — da
-   * kan sesjonen være midt i arbeid, og agentd køer prompten selv.
+   * Instanser vi har sett klar-prompten i, med *hvilken* container-inkarnasjon
+   * det gjaldt (`<id> <startedAt>`). Restartes containeren utenfor broen
+   * (`docker restart`, host-reboot med `restart: unless-stopped`), er det en ny
+   * sesjon med ny onboarding — og da må klar-sjekken gjøres på nytt selv om
+   * `agent-up` aldri ble kjørt herfra.
    */
-  private readonly readyConfirmed = new Set<string>();
+  private readonly readyConfirmed = new Map<string, string>();
 
   constructor(opts: DockerNvtDriverOptions) {
     this.opts = opts;
@@ -196,11 +198,21 @@ export class DockerNvtDriver implements NvtDriver {
   /**
    * Venter til sesjonen kan ta imot en prompt (M0-funn 5).
    *
-   * Klar-tilstand = `session-launched`-markøren finnes **og** tmux-sesjonen
-   * svarer **og** panelet ikke viser en onboarding-dialog. Står en dialog der,
-   * sendes ett Enter per runde (maks `maxEnterPresses`) — vi sender aldri Enter
-   * i blinde, for et Enter inn i en sesjon som venter på svar ville sendt av
-   * halvskrevet input.
+   * Onboardingen er en **sesjonsstart**-tilstand, så sjekken har to nivåer:
+   *
+   * - *Fersk sesjon* (vi har ikke sett klar-prompten i denne container-
+   *   inkarnasjonen): markøren må finnes, tmux svare, og panelet vise
+   *   klar-prompt. Står en onboarding-dialog der, sendes ett Enter per runde
+   *   (maks `maxEnterPresses`).
+   * - *Bekreftet sesjon*: markør + levende tmux er nok. Vi leser ikke panelet,
+   *   og sender ikke Enter. Grunnen er at panelet da inneholder transkriptet —
+   *   inkludert den delegerte oppgaveteksten, som er upålitelig input. Å la
+   *   den styre om broen trykker Enter (eller nekter å levere) ville gitt
+   *   avsender en knapp hen ikke skal ha. Agenten kan dessuten være midt i
+   *   arbeid, og `agentd` køer prompten selv.
+   *
+   * Enter sendes altså aldri i blinde: bare når en dialog faktisk er tegnet i
+   * en sesjon som ikke har vært i bruk.
    *
    * Kaster ved timeout. Feilmeldingen sier hva som manglet, men gjengir
    * *aldri* panelinnholdet: det havner i resultatlinja og videre til Slack, og
@@ -211,46 +223,44 @@ export class DockerNvtDriver implements NvtDriver {
     opts: { timeoutMs: number; signal?: AbortSignal },
   ): Promise<void> {
     const name = instance.instance;
-    const strict = !this.readyConfirmed.has(name);
     const pollMs = this.opts.readyPollMs ?? 2000;
     const maxEnter = this.opts.maxEnterPresses ?? 3;
     const deadline = Date.now() + opts.timeoutMs;
 
     let marker = false;
     let sessionAlive = false;
-    let state: PaneState = "unknown";
+    let state: PaneState | "ikke lest" = "ikke lest";
     let enters = 0;
 
     for (;;) {
       if (opts.signal?.aborted) {
         throw new Error(
-          `klar-sjekken for ${name} ble avbrutt (broen avslutter) — ingen prompt ble sendt`,
+          `klar-sjekken for ${name} ble avbrutt fordi broen avslutter (deploy/omstart). ` +
+            `Ingen prompt ble sendt, og ingenting er levert — oppgaven må sendes på nytt.`,
         );
       }
 
+      const incarnation = await this.incarnation(name);
+      const strict = incarnation === null || this.readyConfirmed.get(name) !== incarnation;
+
       marker = await this.readyMarkerPresent(name);
-      const pane = await this.capturePane(name);
+      const pane = strict ? await this.capturePane(name) : await this.sessionExists(name);
       sessionAlive = pane.ok;
-      state = pane.ok ? classifyPane(pane.text, this.patterns) : "unknown";
+      state = strict ? (pane.ok ? classifyPane(pane.text, this.patterns) : "unknown") : "ikke lest";
 
       if (marker && sessionAlive) {
-        if (state === "onboarding") {
-          if (enters < maxEnter) {
-            enters++;
-            this.log(
-              `${name}: onboarding-dialog i tmux-panelet — sender Enter (${enters}/${maxEnter})`,
-            );
-            await this.sendEnter(name);
-          }
-        } else if (state === "ready") {
-          if (strict) this.log(`${name}: klar-prompt i tmux-panelet etter ${enters} Enter`);
-          this.readyConfirmed.add(name);
+        if (!strict) return;
+        if (state === "ready") {
+          this.log(`${name}: klar-prompt i tmux-panelet etter ${enters} Enter`);
+          if (incarnation !== null) this.readyConfirmed.set(name, incarnation);
           return;
-        } else if (!strict) {
-          // Sesjonen lever, ingen dialog i veien, og vi har sett klar-prompten
-          // før i denne prosessen. Da er den enten klar eller midt i arbeid —
-          // agentd køer prompten uansett.
-          return;
+        }
+        if (state === "onboarding" && enters < maxEnter) {
+          enters++;
+          this.log(
+            `${name}: onboarding-dialog i tmux-panelet — sender Enter (${enters}/${maxEnter})`,
+          );
+          await this.sendEnter(name);
         }
       }
 
@@ -262,7 +272,8 @@ export class DockerNvtDriver implements NvtDriver {
     throw new Error(
       `sesjonen i ${name} ble ikke klar innen ${Math.round(opts.timeoutMs / 1000)}s ` +
         `(session-launched-markør: ${yesNo(marker)}, tmux-sesjon «${this.session}»: ` +
-        `${yesNo(sessionAlive)}, panel: ${state}, Enter sendt: ${enters}). ` +
+        `${yesNo(sessionAlive)}, panel: ${sessionAlive ? state : "ikke lest (ingen sesjon)"}, ` +
+        `Enter sendt: ${enters}). ` +
         `Ingen prompt ble sendt — den ville blitt spist av onboardingen. ` +
         `Sjekk sesjonen i code-server: http://${name}.agent.localhost:4090. ` +
         `Har claude byttet ordlyd i TUI-et, kan mønsteret settes med NVT_READY_PATTERN.`,
@@ -387,12 +398,47 @@ export class DockerNvtDriver implements NvtDriver {
     return { ok: code === 0, text: stdout };
   }
 
+  /** Lever tmux-sesjonen? Brukes når vi ikke skal lese panelinnholdet. */
+  private async sessionExists(instance: string): Promise<{ ok: boolean; text: string }> {
+    const { code } = await this.exec(
+      "docker",
+      ["exec", this.containerName(instance), "tmux", "has-session", "-t", this.session],
+      {},
+    );
+    return { ok: code === 0, text: "" };
+  }
+
+  /**
+   * `<container-id> <startet-tidspunkt>` — identifiserer *denne* oppstarten av
+   * containeren. `null` når containeren ikke finnes eller docker svarer rart;
+   * da behandles sesjonen som fersk (streng sjekk), som er den trygge siden.
+   */
+  private async incarnation(instance: string): Promise<string | null> {
+    const { code, stdout } = await this.exec(
+      "docker",
+      [
+        "inspect",
+        "-f",
+        "{{.Id}} {{.State.StartedAt}}",
+        this.containerName(instance),
+      ],
+      {},
+    );
+    const value = stdout.trim();
+    return code === 0 && value !== "" ? value : null;
+  }
+
   private async sendEnter(instance: string): Promise<void> {
-    await this.exec(
+    const { code, stderr } = await this.exec(
       "docker",
       ["exec", this.containerName(instance), "tmux", "send-keys", "-t", this.session, "Enter"],
       {},
     );
+    if (code !== 0) {
+      // Loggen er audit-sporet: den skal ikke påstå at et Enter ble sendt hvis
+      // tmux avviste det.
+      this.log(`${instance}: send-keys feilet (exit ${code}): ${firstLine(stderr)}`);
+    }
   }
 
   /** Kjører en kommando i nvt-sjekkouten og kaster med målet i meldingen. */
