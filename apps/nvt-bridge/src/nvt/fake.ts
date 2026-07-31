@@ -3,6 +3,7 @@ import type { DoneOutcome, NvtDriver, NvtInstance } from "./driver.ts";
 /** Én ting som skjedde mot fake-driveren, i rekkefølge. */
 export type FakeCall =
   | { kind: "ensure"; topic: string; instance: string }
+  | { kind: "ready"; instance: string; topic: string }
   | { kind: "prompt"; instance: string; topic: string; prompt: string }
   | { kind: "wait"; instance: string; topic: string }
   | { kind: "stop"; instance: string; topic: string };
@@ -35,7 +36,16 @@ export class FakeNvtDriver implements NvtDriver {
     at: "1970-01-01T00:00:00.000Z",
   });
 
+  /**
+   * Kalles av `waitUntilReady`. Kast for å simulere en sesjon som aldri blir
+   * klar (onboarding-dialogen står, tmux svarer ikke) — broen skal da skrive en
+   * `status:"error"`-linje UTEN å ha sendt prompten.
+   */
+  onReady: (ctx: { instance: NvtInstance }) => Promise<void> | void = () => {};
+
   private nextOutcome = new Map<string, DoneOutcome>();
+  /** Instanser `waitUntilReady` har svart OK for. */
+  private readonly ready = new Set<string>();
 
   async ensureInstance(topic: string, instance: string): Promise<NvtInstance> {
     this.calls.push({ kind: "ensure", topic, instance });
@@ -44,7 +54,24 @@ export class FakeNvtDriver implements NvtDriver {
     return { topic, instance };
   }
 
+  async waitUntilReady(instance: NvtInstance): Promise<void> {
+    this.calls.push({
+      kind: "ready",
+      instance: instance.instance,
+      topic: instance.topic,
+    });
+    await this.onReady({ instance });
+    this.ready.add(instance.instance);
+  }
+
   async sendPrompt(instance: NvtInstance, prompt: string): Promise<void> {
+    // Kontrakten, håndhevet: en prompt før klar-sjekken ville blitt spist av
+    // claude-onboardingen (M0-funn 5). Det skal ikke kunne skje uoppdaget.
+    if (!this.ready.has(instance.instance)) {
+      throw new Error(
+        `kontraktbrudd: sendPrompt til ${instance.instance} uten at waitUntilReady har svart OK`,
+      );
+    }
     this.calls.push({
       kind: "prompt",
       instance: instance.instance,
@@ -90,6 +117,8 @@ export class FakeNvtDriver implements NvtDriver {
       topic: instance.topic,
     });
     this.live.delete(instance.instance);
+    // Ny sesjon neste gang ⇒ klar-sjekken må gjøres om igjen.
+    this.ready.delete(instance.instance);
   }
 
   /** Prompt-tekstene som er injisert, i rekkefølge. */

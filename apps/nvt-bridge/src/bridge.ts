@@ -15,6 +15,8 @@ export interface BridgeOptions {
   maxParallel: number;
   /** Hvor lenge vi venter på `agentdctl signal done`. */
   promptTimeoutMs: number;
+  /** Hvor lenge vi venter på at sesjonen blir klar til å ta imot prompten. */
+  readyTimeoutMs: number;
   /** Nådefrist for resultatlinja etter `signal done`. */
   resultGraceMs: number;
   /** TTL for `agent-down` av inaktive topics. 0 = av. */
@@ -150,6 +152,15 @@ export class NvtBridge {
       const instance = record?.instance ?? instanceName;
 
       const ref = await this.opts.driver.ensureInstance(topic, instance);
+
+      // Klar-sjekk FØR markeringen og prompten (M0-funn 5): en prompt som
+      // injiseres i claude-onboardingen forsvinner uten spor — ingen feil,
+      // ingen `signal done`, bare en timeout på slutten. Kaster sjekken, er
+      // ingen prompt sendt, og eventet skal ikke stå som injisert.
+      await this.opts.driver.waitUntilReady(ref, {
+        timeoutMs: this.opts.readyTimeoutMs,
+        signal: this.abortSignal,
+      });
       this.log(`topic ${topic}: instans ${instance} klar, injiserer event ${event.id}`);
 
       // Markeres FØR prompten sendes: krasjer bridgen mellom disse to, må

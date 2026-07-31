@@ -33,9 +33,30 @@ export interface NvtDriver {
   ensureInstance(topic: string, instance: string): Promise<NvtInstance>;
 
   /**
+   * Venter til CLI-sesjonen faktisk kan ta imot en prompt, og kaster ved
+   * timeout. **Må kalles før hver `sendPrompt`** — det er en del av kontrakten,
+   * ikke en optimalisering.
+   *
+   * Grunnen er M0-funn 5: claude-onboardingen (velkomstskjerm + trust-dialog)
+   * spiser prompts som injiseres for tidlig. `agentd` venter på at
+   * `session-launched`-markøren og tmux-sesjonen finnes, men *ikke* på at
+   * claude er kommet gjennom dialogene — da havner prompten i en dialog i
+   * stedet for i sesjonen, og oppgaven forsvinner uten spor.
+   *
+   * Kaster ved timeout (aldri «antatt klar»): broen skriver da en
+   * `status:"error"`-linje, og prompten sendes ikke.
+   */
+  waitUntilReady(
+    instance: NvtInstance,
+    opts: { timeoutMs: number; signal?: AbortSignal },
+  ): Promise<void>;
+
+  /**
    * Injiserer en prompt i instansens levende CLI-sesjon:
    * `agentdctl prompt --source host --external`. `--external` gir
    * «untrusted input»-preamblen — delegerte prompts er upålitelig input.
+   *
+   * Forutsetter at `waitUntilReady` har svart OK for instansen.
    */
   sendPrompt(instance: NvtInstance, prompt: string): Promise<void>;
 

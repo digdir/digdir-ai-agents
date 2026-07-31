@@ -9,12 +9,13 @@ Rollen tilsvarer `scripts/agent-runner.ps1` for engangs-container-agentene,
 men mot nvt i stedet for `docker run`. Design: [`doc/plans/nvt-agent-integrasjon.md`](../../doc/plans/nvt-agent-integrasjon.md).
 Sporet er issue #95; dette er M1 (#97).
 
-> **Status: kjernen er implementert og testet; oppsettet mot ekte
-> nvt-instanser er ikke verifisert.** Alt som antar noe om nvt (make-mål,
-> containernavn, `agentdctl`-format) ligger isolert i
-> [`src/nvt/docker.ts`](src/nvt/docker.ts) og er merket «kalibreres mot
-> M0-funn» (issue #96). Kjernelogikken testes mot en fake-implementasjon og er
-> uavhengig av hvordan den fila ender opp.
+> **Status: kjernen er implementert og testet, og adapteren er kalibrert mot
+> M0-funnene — men ikke kjørt ende-til-ende mot en ekte instans.** Alt som
+> antar noe om nvt (init-flyten, containernavn, `agentdctl`-format,
+> klar-mønstre) ligger isolert i [`src/nvt/docker.ts`](src/nvt/docker.ts).
+> Kjernelogikken testes mot en fake-implementasjon og er uavhengig av hvordan
+> den fila ender opp. Hva som fortsatt er uverifisert står i kommentaren øverst
+> i fila.
 
 ## Hva den gjør
 
@@ -24,14 +25,18 @@ Sporet er issue #95; dette er M1 (#97).
    `-d2`, …), ellers eventets egen id. Topicet er opphavstråden, så
    oppfølgingsevents havner i samme instans og samme samtale.
 3. **Mapper topic → instans** i `state/topics.json`. Finnes ingen instans:
-   `agent-init` + `agent-up`. Finnes den: gjenbruk den levende sesjonen.
-4. **Injiserer prompten**:
+   `agent-init --user non-root` + `agent-up`. Finnes den: gjenbruk den levende
+   sesjonen.
+4. **Venter til sesjonen er klar** — `session-launched`-markøren finnes,
+   tmux-sesjonen svarer, og panelet viser ikke en onboarding-dialog. Se
+   «Klar-sjekken» under.
+5. **Injiserer prompten**:
    `docker exec <instans> agentdctl prompt --source host --external`.
    `--external` er ikke valgfritt — delegerte prompts er upålitelig input, og
    flagget gir nvt sin «untrusted input»-preamble.
-5. **Venter** på `agentdctl signal done`, og verifiserer at agenten faktisk
+6. **Venter** på `agentdctl signal done`, og verifiserer at agenten faktisk
    skrev resultatlinja.
-6. **Rydder**: `agent-down` for topics som har vært stille lenger enn TTL.
+7. **Rydder**: `agent-down` for topics som har vært stille lenger enn TTL.
    Workspacet beholdes, så instansen kan gjenskapes med samme arbeidskopi.
 
 Serielt innen et topic, parallelt på tvers (maks N). Serialiseringen er ikke
@@ -71,6 +76,112 @@ midt i arbeidet ville vært verre enn et ærlig «ukjent utfall». Broen venter
 nådefristen på at agenten skriver linja selv, og melder ellers feil med peker
 til instansen. Ved `SIGTERM`/`SIGINT` avslutter broen først når events under
 arbeid har fått skrevet resultatlinja si.
+
+## Kalibrert mot M0-funnene
+
+M0 (issue #96) kjørte hele kjeden manuelt og traff fem feller. Alle er
+adressert i adapteren; her er hva du som drifter må vite.
+
+### 1. Agenten kjører som non-root — ellers dør sesjonen
+
+claude nekter `--dangerously-skip-permissions` som root, og tmux-sesjonen dør
+innen 5 sekunder (tre forsøk, så exit). Broen kjører derfor
+`agent-init --user non-root`, som gir `AGENT_RUN_USER=1000:1000`.
+
+Merk at dette **ikke** går via `make agent-init`: make-målet kaller
+`scripts/agent-init.sh --name --type --autonomy` og forwarder ikke `--user`.
+Broen kaller scriptet direkte. `agent-up`/`agent-down` går fortsatt gjennom
+make.
+
+### 2. Volum-hygiene ved bytte root → non-root
+
+Named-volumene til en instans som *allerede* har kjørt som root beholder
+root-eierskapet, og bootstrap feiler med `Permission denied` selv etter at
+configen er rettet. Volumene må slettes:
+
+```bash
+make agent-down NAME=<navn>
+docker volume rm agent-<navn>_agent-home agent-<navn>_docker-data
+```
+
+Dette gjelder bare instanser opprettet før kalibreringen. Workspacet ligger i
+nvt-sjekkouten, ikke i volumene, men **alt som bare fantes i agentens
+`$HOME`** (CLI-state, cacher) forsvinner. Har du ikke-pushet arbeid i en slik
+instans, hent det ut via code-server først.
+
+### 3. Stier uid 1000 kan traversere
+
+Workspacet bind-mountes på samme absolutte sti inne i containeren, og agenten
+er `1000:1000`. Ligger `NVT_ROOT` under `/root` (mode 0700), feiler bootstrap
+inne i containeren med en kryptisk `Permission denied`. Broen sjekker derfor
+hele stien til `NVT_ROOT` og triggers-katalogen ved oppstart — sistnevnte også
+for *skrive*tilgang, siden agenten appender resultatlinja selv. Symlenker løses
+først, så en lenke ikke kan skjule at målets foreldre er stengt. Bruk f.eks.
+`/srv/nvt-agent`.
+
+**Hva sjekken faktisk kan svare på:** mode-bitene broen leser må være hostens.
+Det stemmer når broen kjører som node-prosess på hosten (`npm start`) — da
+**nekter den å starte** med en melding om hvilket ledd som stopper uid 1000.
+Kjører broen selv i container, er bare `NVT_ROOT` og triggers-katalogen
+bind-mountet; mellomleddene er mount-point-foreldre Docker har laget, med helt
+andre rettigheter enn hostens. Da logges funnet som en **advarsel** i stedet, og
+stien må kontrolleres på hosten. Samme gjelder macOS, der Docker Desktop mapper
+eierskap i virtiofs-laget. `NVT_BRIDGE_SKIP_PATH_CHECK=1` slår sjekken av helt.
+
+### 4. Commit-identitet må være eksplisitt i `agent.yaml`
+
+`static_token`/broker-token-providere kan ikke rapportere commit-identitet, så
+`identity.mode: provider` (som står i nvt-malens kommenterte eksempel) gir en
+agent uten identitet — og `git commit` feiler *etter* at jobben er gjort.
+
+Broen genererer derfor `.agents/<navn>/agent.yaml` selv, med
+`identity.mode: explicit` og navn/e-post fra `NVT_GIT_IDENTITY_NAME` og
+`NVT_GIT_IDENTITY_EMAIL`. Bot-navnet ligger bevisst i env, ikke i repoet.
+Configen skrives **én gang**, før `agent-init`; en eksisterende config røres
+aldri (den kan være håndredigert), men identiteten verifiseres ved hver
+oppstart, og `mode: provider` stopper broen med en forklaring.
+
+### 5. Klar-sjekken: onboardingen spiser første prompt
+
+claude-onboardingen (velkomstskjerm, trust-dialog) fanger tastetrykk. En prompt
+som injiseres da forsvinner **uten spor** — ingen feil, ingen `signal done`,
+bare en timeout en time senere. `agentd` venter selv på
+`session-launched`-markøren og tmux-sesjonen, men vet ikke om dialogene.
+
+Onboardingen er en **sesjonsstart**-tilstand, så gaten har to nivåer:
+
+| Tilstand | Krav før prompten sendes |
+| --- | --- |
+| Fersk sesjon (klar-prompten er ikke sett i denne container-inkarnasjonen) | Markøren finnes, tmux svarer, og panelet (`tmux capture-pane`) viser klar-prompt. Står en onboarding-dialog der, sendes ett Enter per runde (maks `NVT_BRIDGE_MAX_ONBOARDING_ENTER`, default 3). |
+| Bekreftet sesjon | Markøren finnes og tmux-sesjonen lever. Panelet leses ikke. |
+
+Enter sendes altså aldri i blinde — bare når en dialog faktisk er tegnet i en
+sesjon som ikke har vært i bruk.
+
+To detaljer som er verdt å kjenne:
+
+- **Panelet leses bare på en fersk sesjon**, fordi det ellers inneholder
+  transkriptet — inkludert den delegerte oppgaveteksten, som er upålitelig
+  input. Lot vi den styre gaten, kunne en avsender som skrev
+  «Do you trust the files in this folder?» i oppgaven fått broen til å tro at en
+  dialog sto der, og dermed blokkert topicet. Mønstrene er i tillegg
+  linjeankret, slik at et ekko av oppgaveteksten (som står bak en `>`-prompt)
+  ikke matcher.
+- **Klar-tilstanden gjelder én container-inkarnasjon** (`docker inspect` sin
+  `Id` + `StartedAt`). Restartes containeren utenfor broen — `docker restart`,
+  host-reboot med `restart: unless-stopped` — er det en ny sesjon med ny
+  onboarding, og gaten blir streng igjen selv om broen aldri kjørte `agent-up`.
+
+Blir sesjonen ikke klar innen `NVT_BRIDGE_READY_TIMEOUT_SECONDS`, kaster
+sjekken, prompten sendes ikke, og eventet får en `status:"error"`-linje med
+peker til code-server. Feilmeldingen gjengir **ikke** panelinnholdet — den går
+videre til Slack, og en tmux-skjerm kan inneholde hva som helst.
+
+Mønstergjenkjenning mot et TUI er heuristikk. Bytter claude ordlyd, kan
+mønstrene settes med `NVT_READY_PATTERN` / `NVT_ONBOARDING_PATTERN` (regex,
+case-insensitive) uten kodeendring. Feiler klar-mønsteret å matche en sesjon som
+*er* klar, blir utfallet en ærlig feilmelding og en uendret innboks — ikke en
+tapt oppgave.
 
 ## Oppstart
 
@@ -120,9 +231,12 @@ node-prosess under WSL2; koden er den samme.
 | `src/prompt.ts` | Prompten som injiseres, og fallback-forklaringene |
 | `src/bridge.ts` | Orkestreringen og fallback-invariantene |
 | `src/nvt/driver.ts` | Interfacet mot nvt |
-| `src/nvt/fake.ts` | Fake-implementasjon for tester |
+| `src/nvt/fake.ts` | Fake-implementasjon for tester (håndhever klar-sjekk før prompt) |
 | `src/nvt/dryrun.ts` | Tørrkjøring |
-| `src/nvt/docker.ts` | **Ekte adapter — kalibreres mot M0-funn** |
+| `src/nvt/docker.ts` | **Ekte adapter — kalibrert mot M0-funnene** |
+| `src/nvt/ready.ts` | Klar-tilstand: klassifisering av tmux-panelet |
+| `src/nvt/paths.ts` | Sti-validering mot uid 1000 (fail-fast ved oppstart) |
+| `src/nvt/agentConfig.ts` | `agent.yaml` med eksplisitt commit-identitet |
 
 Node ≥ 22.6, ingen runtime-avhengigheter, ingen byggesteg (native
 type-stripping), `node --test` — samme stack som `integrations/`.

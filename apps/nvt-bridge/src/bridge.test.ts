@@ -42,6 +42,7 @@ async function harness(overrides: HarnessOptions = {}): Promise<Harness> {
     instanceNaming: { prefix: "fatdev", maxLength: 40 },
     maxParallel: overrides.maxParallel ?? 4,
     promptTimeoutMs: 1000,
+    readyTimeoutMs: 1000,
     resultGraceMs: overrides.resultGraceMs ?? 0,
     idleTtlMs: 0,
     // Ingen ekte venting i tester — men vi husker hvor lenge det ble ventet.
@@ -190,6 +191,48 @@ test("to topics kjører i hver sin instans uten å påvirke hverandre", async ()
 
   assert.equal(h.driver.everCreated.size, 2);
   assert.equal((await h.results()).length, 2);
+});
+
+test("klar-sjekken kommer før prompten, hver gang (M0-funn 5)", async () => {
+  const h = await harness();
+  h.driver.onPrompt = () => ({ kind: "timeout", waitedMs: 1 });
+
+  await h.push(evt("e1-d1", "topic-1"));
+  await h.bridge.pollOnce();
+  await h.bridge.scheduler.idle();
+  await h.push(evt("e1-d2", "topic-1"));
+  await h.bridge.pollOnce();
+  await h.bridge.scheduler.idle();
+
+  assert.deepEqual(
+    h.driver.calls.map((c) => c.kind),
+    ["ensure", "ready", "prompt", "wait", "ensure", "ready", "prompt", "wait"],
+    "også oppfølgingsprompten skal ha en klar-sjekk foran seg",
+  );
+});
+
+test("en sesjon som ikke blir klar gir status:error, og prompten sendes ikke", async () => {
+  const h = await harness();
+  h.driver.onReady = () => {
+    throw new Error("sesjonen i fatdev-x ble ikke klar innen 180s (panel: onboarding)");
+  };
+
+  await h.push(evt("e1", "topic-1"));
+  await h.bridge.pollOnce();
+  await h.bridge.scheduler.idle();
+
+  assert.equal(
+    h.driver.calls.some((c) => c.kind === "prompt"),
+    false,
+    "en prompt inn i onboardingen forsvinner uten spor — den skal ikke sendes",
+  );
+  const [line] = await h.results();
+  assert.equal(line!.status, "error");
+  assert.match(line!.reply!, /ble ikke klar/);
+  assert.match(line!.reply!, /Ingen leveranse er bekreftet/);
+  // Eventet er ikke injisert, så det skal ikke stå som «under arbeid» og
+  // blokkere topicet etter en omstart.
+  assert.equal(h.store.get("topic-1")?.in_flight_event_id, undefined);
 });
 
 test("prompts inn i samme sesjon er alltid serielle", async () => {
@@ -430,6 +473,7 @@ test("triggers-stien i prompten er konfigurerbar", async () => {
     instanceNaming: { prefix: "fatdev", maxLength: 40 },
     maxParallel: 1,
     promptTimeoutMs: 10,
+    readyTimeoutMs: 1000,
     resultGraceMs: 0,
     idleTtlMs: 0,
     instanceTriggersPath: "/mnt/triggers",
@@ -515,6 +559,7 @@ test("TTL tar ned inaktive topics, men beholder state og workspace", async () =>
     instanceNaming: { prefix: "fatdev", maxLength: 40 },
     maxParallel: 2,
     promptTimeoutMs: 10,
+    readyTimeoutMs: 1000,
     resultGraceMs: 0,
     idleTtlMs: 1, // alt er "inaktivt" med en gang
     sleep: async () => {},
@@ -554,6 +599,7 @@ test("TTL rører ikke et topic som har arbeid i kø", async () => {
     instanceNaming: { prefix: "fatdev", maxLength: 40 },
     maxParallel: 2,
     promptTimeoutMs: 10,
+    readyTimeoutMs: 1000,
     resultGraceMs: 0,
     idleTtlMs: 1,
     sleep: async () => {},
