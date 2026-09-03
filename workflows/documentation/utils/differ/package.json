@@ -21,7 +21,7 @@
     "@anthropic-ai/sdk": "^0.52.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "diff-match-patch": "^1.0.5",
-    "express": "^4.22.2",
+    "express": "^5.2.1",
     "marked": "^15.0.0",
     "open": "^10.1.0",
     "simple-git": "^3.36.0",
